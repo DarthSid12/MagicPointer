@@ -1,6 +1,6 @@
-# MagicPointer — feature 6 checkpoint
+# MagicPointer — feature 7 checkpoint
 
-Windows-first pointer prototype. This checkpoint implements features 1–6.
+Windows-first pointer prototype. This checkpoint implements features 1–7.
 Commands available: download-model, targets, cameras, calibrate, run --debug, run (stereo desktop activation). Later gesture behaviors are not implemented yet.
 Hardware validation, native Windows input validation and the 12-foot target remain
 pending. See FEATURES.md, DEVELOPMENT.md and VALIDATION.md.
@@ -31,3 +31,5 @@ For stereo activation: `python -m magicpointer run --left 0 --right 1 --fps 30`.
 Index-tip position controls a 40 × 25 cm local workspace around the activation fist.
 
 Index+thumb clicks left; index+thumb+middle clicks right. Hold 0.18 s, then return to index-only/fist before repeating. Open chord fingers together.
+
+Index+middle vertical movement scrolls. A held click must be released to index-only/fist before scrolling.

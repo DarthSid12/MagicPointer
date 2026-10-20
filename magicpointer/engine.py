@@ -114,4 +114,14 @@ class Engine:
         if gesture in (Gesture.LEFT, Gesture.RIGHT) and not self._action_latched:
             self._action_latched = True
             events.append(Event("click", "left" if gesture == Gesture.LEFT else "right"))
+        elif gesture == Gesture.SCROLL and not self._action_latched:
+            # Entry emits nothing; all motion is relative to the entry location.
+            y = observation.tip[1]
+            if self._scroll_y is None:
+                self._scroll_y = y
+            else:
+                lines = int((self._scroll_y - y) / self.height * 30)
+                if lines:
+                    self._scroll_y -= lines * self.height / 30
+                    events.append(Event("scroll", max(-10, min(10, lines))))
         return events

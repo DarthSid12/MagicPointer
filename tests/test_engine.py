@@ -60,6 +60,15 @@ class EngineTests(unittest.TestCase):
         events = self.hold(Gesture.LEFT, 0.3)
         self.assertEqual([e.kind for e in events].count('click'), 1)
 
+    def test_scroll_relative_motion_no_entry_jump(self):
+        self.activate()
+        entry = self.hold(Gesture.SCROLL, 0.3, tip=(0.0, 0.2, 2.0))
+        self.assertEqual(entry, [])
+        events = self.sample(Gesture.SCROLL, tip=(0.0, 0.1, 2.0))
+        self.assertEqual([e.kind for e in events], ['scroll'])
+        self.assertGreater(events[0].value, 0)
+        self.assertEqual(self.sample(Gesture.SCROLL, tip=(0.0, 0.1, 2.0)), [])
+
     def test_loss_suppresses_actions_and_clears_origin(self):
         self.activate()
         self.assertEqual(self.sample(None), [])
