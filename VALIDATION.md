@@ -155,3 +155,8 @@ calibration. The direction estimate uses model camera-frame landmarks rather
 than calibrated stereo geometry. No real camera, pointer events or near-lens
 reliability tests were run; the user must evaluate foreshortening, comfort and
 noise using the local wrist-tilt diagnostic archive.
+
+[Experiment 10.1 CI run 39490932959](https://github.com/Himir-Desai/MagicPointer/actions/runs/39490932959)
+passed on `c63f7aa` for Windows and macOS with Python 3.11: installation,
+dependencies, regression tests, CLI startup and model inference. This does not
+verify physical-camera wrist direction or foreshortened hand tracking.
