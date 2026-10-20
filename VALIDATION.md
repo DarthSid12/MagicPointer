@@ -95,3 +95,18 @@ inspected. CLI help and whitespace checks passed. Recognition thresholds and
 pose decisions are unchanged; their metrics are now exported by the classifier.
 No user hand recordings have yet been collected. B2 remains unfixed pending
 labelled samples and a measured recognition correction.
+
+## B2 correction from supplied landmark recording
+
+The supplied archive was replayed locally without OS input. Recognition matches
+improved from 373/2,592 (14.4%) to 2,553/2,592 (98.5%). All 30 labelled clips
+reach the engine confirmation dwell. Left/right click, scroll and full-palm
+recordings match in every frame. The 39 remaining uncertain frames are confined
+to right-rolled pointing. See reports/B2-analysis.md and reports/B2-replay.json
+for reproducible aggregate results and limitations. The session informed the
+correction; these are not independent test accuracy figures.
+
+Local regression suite: 43 tests, 42 passed, one Windows-only ABI check skipped.
+No cameras or pointer events were used. Real-time replay, natural transitions,
+false click rates, stereo control and other users still require live validation.
+B2 remains open for live confirmation and remaining pointing uncertainty.

@@ -190,8 +190,11 @@ The terminal prints a timestamped `.zip` under `diagnostics/` containing
 chat so the real failures can be measured and the classifier corrected. Different
 distances or hands should use separate sessions. `--seconds 5` records longer
 clips; `--output PATH` changes the local destination. The default diagnostics
-directory is excluded from Git. The existing thresholds remain unchanged until
-recordings support a correction; this tool does not itself fix recognition.
+directory is excluded from Git. Recordings can be replayed against the current classifier using
+`python scripts/evaluate_gestures.py PATH_TO_ZIP`. Classifier version 2 corrects
+the strict joint-angle and thumb-spacing rules identified in the first session;
+see [B2 analysis](reports/B2-analysis.md) for measured improvements and remaining
+limits. Live confirmation is still needed.
 
 The requested 12-foot range (3.6576 m) is a validation target, not a measured
 claim. Real control rejects wrists beyond that measured range. Resolution,

@@ -12,7 +12,7 @@ import zipfile
 from . import __version__
 from .cameras import Cameras
 from .engine import Gesture
-from .tracking import Tracker, gesture_metrics
+from .tracking import CLASSIFIER_VERSION, Tracker, gesture_metrics
 
 POSES = [
     (Gesture.FIST, "Close all fingers into a fist; tuck thumb in"),
@@ -51,6 +51,7 @@ class Session:
         self.path = Path(output) / f"gesture-{stamp}-{uuid.uuid4().hex[:8]}"
         self.path.mkdir(parents=True, exist_ok=False)
         self.metadata = {"schema_version": 1, "app_version": __version__, "created_utc": stamp,
+                         "classifier_version": CLASSIFIER_VERSION,
                          "steps": STEPS, "state_legend": {"extended": 1, "curled": 0, "uncertain": -1},
                          "notes": "Handedness score is not landmark or gesture confidence.",
                          **metadata}

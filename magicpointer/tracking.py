@@ -4,6 +4,8 @@ import math
 
 from .engine import Gesture
 
+CLASSIFIER_VERSION = 2
+
 
 def distance(a, b):
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
@@ -32,16 +34,21 @@ def gesture_metrics(points):
         dip = angle(points[mcp+1], points[mcp+2], points[mcp+3])
         reach = distance(points[mcp+3], points[0]) / max(distance(points[mcp], points[0]), 1e-12)
         curl = distance(points[mcp+3], points[0]) / max(distance(points[mcp+1], points[0]), 1e-12)
-        straight = pip > 155 and dip > 150
-        extended = straight and distance(points[mcp+3], points[0]) > distance(points[mcp], points[0]) * 1.25
+        chain = sum(distance(points[i], points[i+1]) for i in range(mcp, mcp+3))
+        straightness = distance(points[mcp], points[mcp+3]) / max(chain, 1e-12)
+        # Real extended fingers retain a natural bend and model DIP estimates
+        # vary with view. Require reach and an unfolded chain, not two near-180° joints.
+        extended = reach > 1.25 and curl > 1.10 and straightness > .80
         curled = distance(points[mcp+3], points[0]) < distance(points[mcp+1], points[0]) * 1.05
         fingers.append(1 if extended else (0 if curled else -1))
         measurements[name] = {"pip_degrees": pip, "dip_degrees": dip, "reach_ratio": reach,
-                              "curl_ratio": curl, "state": fingers[-1]}
+                              "curl_ratio": curl, "straightness": straightness, "state": fingers[-1]}
     thumb_angle = angle(points[2], points[3], points[4])
-    thumb_straight = thumb_angle > 150
     separation = distance(points[4], points[5]) / palm
-    thumb = 1 if thumb_straight and separation > .65 else (0 if separation < .55 else -1)
+    # Thumb/index spacing overlaps strongly between open and tucked poses.
+    # IP bend separates the supplied examples; a small spacing guard also keeps
+    # a straight thumb laid across the palm from being counted as extended.
+    thumb = 1 if thumb_angle > 145 and separation > .30 else (0 if thumb_angle < 140 or separation < .30 else -1)
     signature = (thumb, *fingers)
     gesture = {
         (0, 0, 0, 0, 0): Gesture.FIST,
@@ -51,7 +58,7 @@ def gesture_metrics(points):
         (0, 1, 1, 0, 0): Gesture.SCROLL,
         (1, 1, 1, 1, 1): Gesture.PALM,
     }.get(signature, Gesture.UNKNOWN)
-    return {"valid": True, "palm_size": palm, "fingers": measurements,
+    return {"valid": True, "classifier_version": CLASSIFIER_VERSION, "palm_size": palm, "fingers": measurements,
             "thumb": {"ip_degrees": thumb_angle, "separation_ratio": separation, "state": thumb},
             "signature": list(signature), "gesture": gesture.value}
 

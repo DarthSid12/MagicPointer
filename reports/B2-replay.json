@@ -1,0 +1,495 @@
+{
+  "source_sha256": "70eb53cbfd9c1f69bc75959e57f65d160622e94ce3e160f517af550cc326f617",
+  "classifier_version": 2,
+  "frames": 2592,
+  "recorded_correct": 373,
+  "current_correct": 2553,
+  "recorded_accuracy": 0.14390432098765432,
+  "current_accuracy": 0.9849537037037037,
+  "note": "Replay of the supplied labelled session used to diagnose and tune this correction; not independent accuracy validation.",
+  "steps": [
+    {
+      "step": 0,
+      "expected": "fist",
+      "orientation": "upright",
+      "frames": 82,
+      "recorded_correct": 0,
+      "current_correct": 82,
+      "recorded_predictions": {
+        "unrecognized": 82
+      },
+      "current_predictions": {
+        "fist": 82
+      },
+      "longest_correct_run_seconds": 2.9769,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 1,
+      "expected": "fist",
+      "orientation": "roll_left",
+      "frames": 91,
+      "recorded_correct": 91,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "fist": 91
+      },
+      "current_predictions": {
+        "fist": 91
+      },
+      "longest_correct_run_seconds": 3.0077,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 2,
+      "expected": "fist",
+      "orientation": "roll_right",
+      "frames": 81,
+      "recorded_correct": 0,
+      "current_correct": 81,
+      "recorded_predictions": {
+        "unrecognized": 81
+      },
+      "current_predictions": {
+        "fist": 81
+      },
+      "longest_correct_run_seconds": 2.9997,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 3,
+      "expected": "fist",
+      "orientation": "yaw_left",
+      "frames": 91,
+      "recorded_correct": 91,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "fist": 91
+      },
+      "current_predictions": {
+        "fist": 91
+      },
+      "longest_correct_run_seconds": 2.9994,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 4,
+      "expected": "fist",
+      "orientation": "yaw_right",
+      "frames": 91,
+      "recorded_correct": 91,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "fist": 91
+      },
+      "current_predictions": {
+        "fist": 91
+      },
+      "longest_correct_run_seconds": 2.9973,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 5,
+      "expected": "point",
+      "orientation": "upright",
+      "frames": 88,
+      "recorded_correct": 88,
+      "current_correct": 88,
+      "recorded_predictions": {
+        "point": 88
+      },
+      "current_predictions": {
+        "point": 88
+      },
+      "longest_correct_run_seconds": 3.0051,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 6,
+      "expected": "point",
+      "orientation": "roll_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "point": 91
+      },
+      "longest_correct_run_seconds": 3.002,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 7,
+      "expected": "point",
+      "orientation": "roll_right",
+      "frames": 90,
+      "recorded_correct": 0,
+      "current_correct": 51,
+      "recorded_predictions": {
+        "unrecognized": 90
+      },
+      "current_predictions": {
+        "unrecognized": 39,
+        "point": 51
+      },
+      "longest_correct_run_seconds": 0.4344,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 8,
+      "expected": "point",
+      "orientation": "yaw_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "point": 91
+      },
+      "longest_correct_run_seconds": 2.9988,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 9,
+      "expected": "point",
+      "orientation": "yaw_right",
+      "frames": 77,
+      "recorded_correct": 12,
+      "current_correct": 77,
+      "recorded_predictions": {
+        "unrecognized": 65,
+        "point": 12
+      },
+      "current_predictions": {
+        "point": 77
+      },
+      "longest_correct_run_seconds": 2.9744,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 10,
+      "expected": "left click",
+      "orientation": "upright",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "left click": 91
+      },
+      "longest_correct_run_seconds": 2.9987,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 11,
+      "expected": "left click",
+      "orientation": "roll_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "left click": 91
+      },
+      "longest_correct_run_seconds": 3.0047,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 12,
+      "expected": "left click",
+      "orientation": "roll_right",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "left click": 91
+      },
+      "longest_correct_run_seconds": 3.0003,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 13,
+      "expected": "left click",
+      "orientation": "yaw_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "left click": 91
+      },
+      "longest_correct_run_seconds": 3.0017,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 14,
+      "expected": "left click",
+      "orientation": "yaw_right",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "left click": 91
+      },
+      "longest_correct_run_seconds": 3.0007,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 15,
+      "expected": "scroll",
+      "orientation": "upright",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "scroll": 91
+      },
+      "longest_correct_run_seconds": 2.9853,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 16,
+      "expected": "scroll",
+      "orientation": "roll_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "scroll": 91
+      },
+      "longest_correct_run_seconds": 2.9978,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 17,
+      "expected": "scroll",
+      "orientation": "roll_right",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "scroll": 91
+      },
+      "longest_correct_run_seconds": 3.0031,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 18,
+      "expected": "scroll",
+      "orientation": "yaw_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "scroll": 91
+      },
+      "longest_correct_run_seconds": 3.0032,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 19,
+      "expected": "scroll",
+      "orientation": "yaw_right",
+      "frames": 90,
+      "recorded_correct": 0,
+      "current_correct": 90,
+      "recorded_predictions": {
+        "unrecognized": 90
+      },
+      "current_predictions": {
+        "scroll": 90
+      },
+      "longest_correct_run_seconds": 2.9983,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 20,
+      "expected": "right click",
+      "orientation": "upright",
+      "frames": 89,
+      "recorded_correct": 0,
+      "current_correct": 89,
+      "recorded_predictions": {
+        "unrecognized": 89
+      },
+      "current_predictions": {
+        "right click": 89
+      },
+      "longest_correct_run_seconds": 3.0083,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 21,
+      "expected": "right click",
+      "orientation": "roll_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "scroll": 73,
+        "unrecognized": 18
+      },
+      "current_predictions": {
+        "right click": 91
+      },
+      "longest_correct_run_seconds": 3.0012,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 22,
+      "expected": "right click",
+      "orientation": "roll_right",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "right click": 91
+      },
+      "longest_correct_run_seconds": 3.0007,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 23,
+      "expected": "right click",
+      "orientation": "yaw_left",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "right click": 91
+      },
+      "longest_correct_run_seconds": 2.9999,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 24,
+      "expected": "right click",
+      "orientation": "yaw_right",
+      "frames": 90,
+      "recorded_correct": 0,
+      "current_correct": 90,
+      "recorded_predictions": {
+        "unrecognized": 90
+      },
+      "current_predictions": {
+        "right click": 90
+      },
+      "longest_correct_run_seconds": 2.9878,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 25,
+      "expected": "open palm",
+      "orientation": "upright",
+      "frames": 80,
+      "recorded_correct": 0,
+      "current_correct": 80,
+      "recorded_predictions": {
+        "unrecognized": 80
+      },
+      "current_predictions": {
+        "open palm": 80
+      },
+      "longest_correct_run_seconds": 2.9749,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 26,
+      "expected": "open palm",
+      "orientation": "roll_left",
+      "frames": 65,
+      "recorded_correct": 0,
+      "current_correct": 65,
+      "recorded_predictions": {
+        "unrecognized": 65
+      },
+      "current_predictions": {
+        "open palm": 65
+      },
+      "longest_correct_run_seconds": 3.0071,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 27,
+      "expected": "open palm",
+      "orientation": "roll_right",
+      "frames": 91,
+      "recorded_correct": 0,
+      "current_correct": 91,
+      "recorded_predictions": {
+        "unrecognized": 91
+      },
+      "current_predictions": {
+        "open palm": 91
+      },
+      "longest_correct_run_seconds": 3.0011,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 28,
+      "expected": "open palm",
+      "orientation": "yaw_left",
+      "frames": 65,
+      "recorded_correct": 0,
+      "current_correct": 65,
+      "recorded_predictions": {
+        "unrecognized": 65
+      },
+      "current_predictions": {
+        "open palm": 65
+      },
+      "longest_correct_run_seconds": 3.0092,
+      "reaches_engine_dwell": true
+    },
+    {
+      "step": 29,
+      "expected": "open palm",
+      "orientation": "yaw_right",
+      "frames": 57,
+      "recorded_correct": 0,
+      "current_correct": 57,
+      "recorded_predictions": {
+        "unrecognized": 57
+      },
+      "current_predictions": {
+        "open palm": 57
+      },
+      "longest_correct_run_seconds": 2.979,
+      "reaches_engine_dwell": true
+    }
+  ]
+}
