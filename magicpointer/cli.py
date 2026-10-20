@@ -25,7 +25,7 @@ def parser():
     root = argparse.ArgumentParser(description="MagicPointer: Windows-first stereo hand pointer")
     root.add_argument("--version", action="version", version=__version__)
     commands = root.add_subparsers(dest="command")
-    for name in ("calibrate",):
+    for name in ("run", "calibrate"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--left", type=camera, default=0, help="primary camera index (default: 0)")
         cmd.add_argument("--right", type=camera, required=name == "calibrate", help="secondary camera index")

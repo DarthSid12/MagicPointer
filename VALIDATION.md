@@ -1,4 +1,4 @@
-# Checkpoint 2 validation
+# Checkpoint 3 validation
 
 The final batched software validation passed before this checkpoint sequence.
 This checkpoint is additionally checked in an isolated snapshot with only its
