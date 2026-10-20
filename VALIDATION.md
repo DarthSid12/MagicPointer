@@ -250,7 +250,8 @@ All valid `run --debug` sessions now create a unique local debug directory and
 record continuous samples for mono or stereo preview. Existing tilt experiment
 recordings and labelled collection intervals retain their formats. The common
 diagnostic-data component is implemented independently of the pending user choice
-about additionally saving camera video. No image/video/audio capture was added.
+about additionally saving camera video (subsequently resolved as data only). No
+image/video/audio capture was added.
 
 Local checks: 80 tests run, 79 passed, one Windows-only ABI test skipped. New
 coverage checks full-session recording including no-hand frames, actual simulated
@@ -268,4 +269,9 @@ may leave the session folder without its final ZIP.
 passed on `9d8547b` for Windows and macOS with Python 3.11, including installation,
 dependency checks, regression tests, CLI startup, model download and blank-frame
 inference. Live recording performance and optional camera-video recording remain
-outside these checks; the video preference is still awaiting the user's answer.
+outside these checks. The user subsequently confirmed data-only recording; no
+video is requested and no runtime change is needed.
+
+Feature 11 clarification: data-only preference confirmed. Documentation and ledger
+updated; whitespace checks passed. No tests rerun for this documentation-only
+confirmation; runtime remains the CI-validated implementation above.
