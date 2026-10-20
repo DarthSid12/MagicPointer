@@ -73,8 +73,8 @@ def render(image, hand, result, offset, message, wrist=False):
                    'down': 'Tilt fingers in your DOWN direction, hold steady, then press D',
                    'live': 'Tilt down/up for continuous scroll; return to neutral to stop'}[result['phase']]
     if wrist:
-        instruction = ('Point two straight fingers at screen; hold steady; SPACE neutral' if result['phase'] == 'neutral'
-                       else f"Tilt whole hand UP/DOWN; keep fingers straight; +/-{result['dead_zone_degrees']:g} deg = STOP")
+        instruction = ('Point index + middle at screen; thumb relaxed; SPACE neutral' if result['phase'] == 'neutral'
+                       else f"Tilt whole hand UP/DOWN; thumb relaxed; +/-{result['dead_zone_degrees']:g} deg = STOP")
     movement = 'STOP' if abs(speed) < .01 else ('DOWN' if speed > 0 else 'UP')
     keys = 'SPACE neutral | R reset | Q / Esc save and exit' if wrist else 'SPACE neutral | D down range | R reset | Q / Esc save and exit'
     title = 'WRIST TILT' if wrist else 'FINGER TILT'
@@ -110,12 +110,13 @@ def run(args):
             metadata = {'camera': cameras.info, 'dead_zone_degrees': args.dead_zone}
             if wrist:
                 metadata.update({'kind': 'wrist-tilt', 'measurement_frame': 'camera',
+                                 'shape_policy': 'index/middle extended, ring/little curled, thumb ignored',
                                  'full_speed_angle_degrees': args.full_speed_angle,
                                  'note': 'Model-estimated camera-relative pitch; preview only. No images or OS input.'})
             log = Log(args.output, metadata)
             if wrist:
                 print('Wrist experiment: SPACE neutral, R reset, Q save/exit. No OS input.')
-                print('Point two straight fingers toward screen; tilt the whole hand at the wrist.')
+                print('Point index + middle toward screen, curl ring/little, relax thumb; tilt at the wrist.')
             else:
                 print('Tilt experiment: SPACE neutral, D down range, R reset, Q save/exit. No OS input.')
                 print('Keep your palm steady and tilt the extended fingers at their base knuckles.')

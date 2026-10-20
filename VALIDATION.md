@@ -160,3 +160,18 @@ noise using the local wrist-tilt diagnostic archive.
 passed on `c63f7aa` for Windows and macOS with Python 3.11: installation,
 dependencies, regression tests, CLI startup and model inference. This does not
 verify physical-camera wrist direction or foreshortened hand tracking.
+
+## B5: wrist experiment thumb exclusion
+
+Local regression suite: 62 tests, 61 passed, one Windows-only ABI check skipped.
+The supplied 1,952-frame wrist archive was replayed through the updated controller
+with its original neutral/reset key events. Accepted frames increased 586 → 938,
+down command frames 2 → 96, maximum down output 2.09 → 12 lines/sec. These are
+simulated output counts, not labelled intent accuracy; the recording informed
+the correction. No raw recordings were committed or OS input emitted.
+
+Synthetic tests cover open-thumb downscroll, unchanged ordinary gesture/finger
+experiment semantics, retained fist/full-palm rejection and offline replay.
+Remaining no-hand, folded-finger and direction failures are still rejected. See
+reports/B5-wrist-analysis.md and reports/B5-wrist-replay.json for the source hash,
+calibration events, exact aggregates and live-test limitations.

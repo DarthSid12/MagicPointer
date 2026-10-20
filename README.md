@@ -167,8 +167,10 @@ Run `python -m magicpointer run --help` for details.
 python -m magicpointer wrist-tilt --camera 0 --fps 30
 ```
 
-Keep index and middle fingers straight, tuck the thumb and curl ring/little
-fingers. With the camera approximately level near the screen, point the two
+Keep index and middle fingers straight and curl ring/little fingers. Let the
+thumb rest comfortably; its position is ignored in this isolated wrist experiment
+because it has no click actions. The normal classifier readout may say `right click`
+when your thumb opens; this does not trigger a click or cancel wrist scrolling. With the camera approximately level near the screen, point the two
 fingers toward the screen/camera in a comfortable neutral direction. Hold steady
 for half a second and press **Space**. This starts the simulated scroll controller
 immediately; no D calibration is needed.

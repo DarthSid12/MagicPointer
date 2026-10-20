@@ -10,20 +10,20 @@ import numpy as np
 
 from magicpointer.cli import parser
 from magicpointer.engine import Gesture
-from magicpointer.tilt import WristTilt, measure_wrist
+from magicpointer.tilt import WristTilt, measure, measure_wrist
 from magicpointer.tilt_app import run
 from magicpointer.tracking import Hand, classify
 from test_tracking import hand
 
 
-def camera_pose(pitch=0., yaw=0., roll=0.):
+def camera_pose(pitch=0., yaw=0., roll=0., thumb=False):
     # Whole-hand rotation: local fingers point -Y; rotate them toward camera -Z.
     x = math.radians(90+pitch)
     y, z = math.radians(yaw), math.radians(roll)
     rx = np.array([[1, 0, 0], [0, math.cos(x), -math.sin(x)], [0, math.sin(x), math.cos(x)]])
     ry = np.array([[math.cos(y), 0, math.sin(y)], [0, 1, 0], [-math.sin(y), 0, math.cos(y)]])
     rz = np.array([[math.cos(z), -math.sin(z), 0], [math.sin(z), math.cos(z), 0], [0, 0, 1]])
-    points = hand(False, [1, 1, 0, 0]) @ (rz @ ry @ rx).T
+    points = hand(thumb, [1, 1, 0, 0]) @ (rz @ ry @ rx).T
     return Hand(np.zeros((21, 2)), points.tolist(), 'Right', classify(points))
 
 
@@ -86,6 +86,29 @@ class WristTests(unittest.TestCase):
         for angle in (5., 10., 61., float('nan')):
             with self.assertRaises(ValueError):
                 WristTilt(full_speed_angle=angle)
+
+    def test_open_thumb_does_not_cancel_wrist_downscroll_or_change_other_modes(self):
+        self.calibrate()
+        # Mimic the reported downward tilt with an open-thumb/right-click label.
+        for _ in range(25):
+            self.now += .03
+            sample = camera_pose(30., thumb=True)
+            result = self.controller.update(sample, self.now)
+        self.assertEqual(sample.gesture, Gesture.RIGHT)
+        self.assertTrue(result['valid'])
+        self.assertEqual(result['phase'], 'live')
+        self.assertGreater(result['lines_per_second'], 11.9)
+        # The old finger experiment's thumb requirement is intentionally retained.
+        self.assertIsNone(measure(sample)[0])
+
+    def test_open_thumb_cannot_bypass_folded_or_open_palm_rejection(self):
+        sample = camera_pose(25., thumb=True)
+        points = hand(True, [0, 0, 0, 0])
+        sample.world = points.tolist()
+        self.assertIsNone(measure_wrist(sample)[0])
+        points = hand(True, [1, 1, 1, 1])
+        sample.world = points.tolist()
+        self.assertIsNone(measure_wrist(sample)[0])
 
 
 class WristAppTests(unittest.TestCase):

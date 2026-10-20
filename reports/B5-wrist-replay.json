@@ -1,0 +1,70 @@
+{
+  "source_sha256": "a45f14bab1aab01d9eca09ebd1a52cb17b2d92bb4e6ad0d807fd37efd9a188a2",
+  "recorded": {
+    "frames": 1952,
+    "valid_frames": 586,
+    "live_frames": 275,
+    "down_command_frames": 2,
+    "up_command_frames": 105,
+    "maximum_down_lines_per_second": 2.086946704165297,
+    "maximum_up_lines_per_second": 11.952876533732297,
+    "reasons": {
+      "Tuck thumb and curl ring/little fingers": 681,
+      "No hand": 659,
+      "Keep index and middle fingers extended": 20,
+      "Two-finger direction valid": 586,
+      "Point the two fingers toward the screen/camera": 5,
+      "Point both fingers in the same direction": 1
+    }
+  },
+  "replayed": {
+    "frames": 1952,
+    "valid_frames": 938,
+    "live_frames": 675,
+    "down_command_frames": 96,
+    "up_command_frames": 172,
+    "maximum_down_lines_per_second": 12.0,
+    "maximum_up_lines_per_second": 12.0,
+    "reasons": {
+      "Keep index and middle fingers extended": 213,
+      "No hand": 659,
+      "Two-finger direction valid": 938,
+      "Point the two fingers toward the screen/camera": 100,
+      "Curl ring/little fingers": 39,
+      "Point both fingers in the same direction": 3
+    }
+  },
+  "neutral_captures": [
+    {
+      "seconds": 32.001652916,
+      "accepted": true,
+      "neutral_degrees": -27.726337277428286
+    },
+    {
+      "seconds": 38.603618415999996,
+      "accepted": true,
+      "neutral_degrees": -12.21238652747087
+    },
+    {
+      "seconds": 44.332626041,
+      "accepted": true,
+      "neutral_degrees": -16.827811508177348
+    },
+    {
+      "seconds": 59.404502625,
+      "accepted": true,
+      "neutral_degrees": -28.676899943759736
+    },
+    {
+      "seconds": 63.305933749999994,
+      "accepted": true,
+      "neutral_degrees": -20.55601049563498
+    },
+    {
+      "seconds": 65.24015324999999,
+      "accepted": false,
+      "reason": "Hold the two-finger pose steady for at least half a second"
+    }
+  ],
+  "note": "Replay of the supplied unlabelled session used for diagnosis. Command counts are simulated output, not intended-direction accuracy. No raw landmarks are included in this report."
+}

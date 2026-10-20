@@ -11,7 +11,7 @@ def wrapped(angle):
     return (angle + 180.) % 360. - 180.
 
 
-def measure(hand):
+def measure(hand, *, allow_thumb=False):
     if hand is None:
         return None, 'No hand'
     try:
@@ -24,8 +24,8 @@ def measure(hand):
     if not metrics['valid']:
         return None, 'Invalid palm'
     fingers = metrics['fingers']
-    if metrics['thumb']['state'] != 0 or any(fingers[name]['state'] != 0 for name in ('ring', 'little')):
-        return None, 'Tuck thumb and curl ring/little fingers'
+    if (not allow_thumb and metrics['thumb']['state'] != 0) or any(fingers[name]['state'] != 0 for name in ('ring', 'little')):
+        return None, 'Curl ring/little fingers' if allow_thumb else 'Tuck thumb and curl ring/little fingers'
     # MCP flexion is the experimental signal. The normal classifier also checks
     # reach from the wrist, so it may reject a valid tilted pair. Keep straight
     # finger chains here, without requiring unchanged wrist-to-tip reach.
@@ -65,7 +65,9 @@ def measure_wrist(hand):
     This is a model estimate from one camera, not calibrated stereo orientation.
     Shape validation is shared, but palm-relative pitch is not the control signal.
     """
-    valid_pitch, reason = measure(hand)
+    # In this isolated, explicitly calibrated wrist mode, thumb position is not
+    # a click chord. Near-camera thumb estimates must not cancel valid pitch.
+    valid_pitch, reason = measure(hand, allow_thumb=True)
     if valid_pitch is None:
         return None, reason
     points = np.asarray(hand.world, dtype=float)
