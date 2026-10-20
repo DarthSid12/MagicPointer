@@ -34,6 +34,20 @@ Validation date: October 20, 2026 (user timezone: America/Los_Angeles).
   selected 0.10.32 build. Native input avoids the initially considered mouse
   library's conflicting macOS build dependencies.
 
+## Completed in GitHub Actions
+
+[Validation run 39482390199](https://github.com/Himir-Desai/MagicPointer/actions/runs/39482390199)
+passed on implementation commit `0758819`:
+
+- **Windows / Python 3.11:** all 33 tests passed, including the native SendInput
+  structure ABI check. Package installation, dependency checks, CLI startup,
+  model download and blank-frame model inference passed.
+- **macOS / Python 3.11:** 32 tests passed, with the Windows-only ABI test skipped.
+  Package installation, dependency checks, CLI startup, model download and
+  blank-frame model inference passed.
+
+These hosted checks use synthetic frames and do not send real pointer events.
+
 ## Not yet validated
 
 - Physical cameras: device enumeration, 1080p bandwidth, achievable 30/60 FPS,
@@ -45,9 +59,6 @@ Validation date: October 20, 2026 (user timezone: America/Los_Angeles).
 - Native Windows cursor/button/wheel injection, DPI scaling, chimes and camera
   backend; macOS Accessibility input and actual sound playback. Native input APIs
   were implemented but no OS pointer events were sent during local validation.
-- GitHub Actions execution. The included workflow targets Windows and macOS with
-  Python 3.11, tests, dependency checks and a blank-frame model smoke test. A
-  committed workflow is not evidence of a successful CI run.
 
 ## Hardware acceptance session
 
