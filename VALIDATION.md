@@ -180,3 +180,17 @@ calibration events, exact aggregates and live-test limitations.
 passed on `91c798b` for Windows and macOS with Python 3.11: installation,
 dependencies, regression tests, CLI startup and model inference. Live wrist
 tracking and intended-direction accuracy remain to be confirmed by the user.
+
+## B5 live confirmation
+
+The user reports that wrist-tilt-20261020T203236Z-0dbdfdbb.zip looks good. Replay
+exactly reproduces recorded counts, speeds, rejection totals and both neutral
+captures. The 815 live-mode frames include 799 valid frames (98.04%) and 16
+finger-chain rejections. Outputs include 275 down, 288 up and 236 stop frames;
+both directions reach 12 lines/sec. Longest continuous down/up commands are
+7.43/6.84 seconds. No thumb-related rejection remains. See
+reports/B5-live-confirmation.md and reports/B5-confirmation-replay.json.
+
+This validates the reported fix for one user/session, not general gesture
+accuracy or stereo/12-foot/OS-scroll behavior. Runtime code and thresholds were
+unchanged; no new unit or UI tests were run for this documentation-only review.

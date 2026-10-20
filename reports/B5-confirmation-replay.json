@@ -1,0 +1,46 @@
+{
+  "source_sha256": "63374d9e7f3d743bdfc2f6aa083701a33c65244b969add16f7eaa787e66ee592",
+  "recorded": {
+    "frames": 1522,
+    "valid_frames": 980,
+    "live_frames": 815,
+    "down_command_frames": 275,
+    "up_command_frames": 288,
+    "maximum_down_lines_per_second": 12.0,
+    "maximum_up_lines_per_second": 12.0,
+    "reasons": {
+      "No hand": 419,
+      "Curl ring/little fingers": 7,
+      "Keep index and middle fingers extended": 116,
+      "Two-finger direction valid": 980
+    }
+  },
+  "replayed": {
+    "frames": 1522,
+    "valid_frames": 980,
+    "live_frames": 815,
+    "down_command_frames": 275,
+    "up_command_frames": 288,
+    "maximum_down_lines_per_second": 12.0,
+    "maximum_up_lines_per_second": 12.0,
+    "reasons": {
+      "No hand": 419,
+      "Curl ring/little fingers": 7,
+      "Keep index and middle fingers extended": 116,
+      "Two-finger direction valid": 980
+    }
+  },
+  "neutral_captures": [
+    {
+      "seconds": 17.796989459,
+      "accepted": true,
+      "neutral_degrees": -23.553102196038054
+    },
+    {
+      "seconds": 31.698271374999997,
+      "accepted": true,
+      "neutral_degrees": -24.644239429806106
+    }
+  ],
+  "note": "Replay of the supplied unlabelled session used for diagnosis. Command counts are simulated output, not intended-direction accuracy. No raw landmarks are included in this report."
+}
