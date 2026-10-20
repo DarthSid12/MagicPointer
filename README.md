@@ -130,7 +130,7 @@ reactivation.
 | Gesture | Result |
 | --- | --- |
 | Closed fist anywhere in the shared view, held 0.45 s | Activation chime; fist wrist becomes origin; cursor centers on primary display |
-| Index extended, other fingers curled | Index tip controls pointer relative to origin |
+| Index extended, other fingers curled | Index tip moves pointer within the local workspace |
 | Index + thumb | One left click after 0.18 s of stable recognition |
 | Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |
 | Index + thumb + middle outside scrolling | One right click after 0.18 s of stable recognition |
@@ -164,8 +164,9 @@ still requires the normal thumb chord; once scrolling has started, that chord
 cannot click until you exit. Model thumb-estimation discrepancies during tilt
 are tracked in B6; ignoring them during scrolling does not correct the classifier.
 
-The interaction plane is parallel to the camera image plane, centered at the
-activation fist. Both whole-hand motion and index-tip motion affect it. A default
+The initial interaction plane is parallel to the camera image plane, centered at
+the activation fist. Resuming after scrolling shifts its mapping to keep the
+pointer at its frozen location. Both whole-hand motion and index-tip motion affect it. A default
 40 × 25 cm workspace maps to the primary display; depth changes do not resize it.
 The cursor is driven by tip **position**, rather than a ray projected along the
 finger. Ring and little fingers stay curled for pointing/clicking/scrolling.

@@ -225,3 +225,8 @@ entry, stereo camera noise or OS/application scroll distance. Synthetic tests
 cover entry and exit; physical stereo and live automatic-neutral checks remain.
 See reports/7-scroll-replay.json and reports/B6-thumb-estimates.md. B6 remains open;
 no ordinary click-classifier threshold has been changed.
+
+[Feature 7 CI run 39494816348](https://github.com/Himir-Desai/MagicPointer/actions/runs/39494816348)
+passed on `fe2a60c` for Windows and macOS with Python 3.11: dependency installation,
+regression suite, CLI startup, official model download and blank-frame inference.
+Physical stereo cameras and live OS scrolling were not exercised by CI.
