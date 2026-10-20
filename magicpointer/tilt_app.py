@@ -11,14 +11,15 @@ import cv2
 import numpy as np
 
 from .cameras import Cameras
-from .tilt import Tilt
+from .tilt import Tilt, WristTilt
 from .tracking import CLASSIFIER_VERSION, Tracker
 
 
 class Log:
     def __init__(self, output, metadata):
         stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-        self.path = Path(output)/f'tilt-{stamp}-{uuid.uuid4().hex[:8]}'
+        prefix = 'wrist-tilt' if metadata.get('kind') == 'wrist-tilt' else 'tilt'
+        self.path = Path(output)/f'{prefix}-{stamp}-{uuid.uuid4().hex[:8]}'
         self.path.mkdir(parents=True, exist_ok=False)
         (self.path/'session.json').write_text(json.dumps({
             'schema_version': 1, 'kind': 'finger-tilt', 'created_utc': stamp,
@@ -58,7 +59,7 @@ class Log:
         print(f'Tilt diagnostics saved: {self.path.with_suffix(".zip")}')
 
 
-def render(image, hand, result, offset, message):
+def render(image, hand, result, offset, message, wrist=False):
     from .app import draw_hand
     panel = np.full((720, 1200, 3), 25, dtype=np.uint8)
     camera = image.copy()
@@ -71,12 +72,17 @@ def render(image, hand, result, offset, message):
     instruction = {'neutral': 'Extend index + middle; hold comfortable neutral; press SPACE',
                    'down': 'Tilt fingers in your DOWN direction, hold steady, then press D',
                    'live': 'Tilt down/up for continuous scroll; return to neutral to stop'}[result['phase']]
+    if wrist:
+        instruction = ('Point two straight fingers at screen; hold steady; SPACE neutral' if result['phase'] == 'neutral'
+                       else f"Tilt whole hand UP/DOWN; keep fingers straight; +/-{result['dead_zone_degrees']:g} deg = STOP")
     movement = 'STOP' if abs(speed) < .01 else ('DOWN' if speed > 0 else 'UP')
-    lines = ['FINGER TILT EXPERIMENT / SIMULATED SCROLL ONLY', instruction,
+    keys = 'SPACE neutral | R reset | Q / Esc save and exit' if wrist else 'SPACE neutral | D down range | R reset | Q / Esc save and exit'
+    title = 'WRIST TILT' if wrist else 'FINGER TILT'
+    lines = [title+' EXPERIMENT / SIMULATED SCROLL ONLY', instruction,
              f"{result['reason']} | Normal classifier: {hand.gesture.value if hand else 'no hand'}",
              f"Pitch: {pitch:+.1f} deg" if pitch is not None else 'Pitch: unavailable',
-             f"From neutral: {delta:+.1f} deg | {movement} {abs(speed):.1f} lines/s" if delta is not None else 'Capture neutral and down range to start',
-             message, 'SPACE neutral | D down range | R reset | Q / Esc save and exit']
+             f"From neutral: {delta:+.1f} deg | {movement} {abs(speed):.1f} lines/s" if delta is not None else ('Capture neutral to start' if wrist else 'Capture neutral and down range to start'),
+             message, keys]
     for i, line in enumerate(lines):
         cv2.putText(panel, line, (14, 27+28*i), cv2.FONT_HERSHEY_SIMPLEX, .63, color, 1, cv2.LINE_AA)
     # The page moves under a fixed virtual cursor; no desktop adapter is imported.
@@ -94,15 +100,25 @@ def render(image, hand, result, offset, message):
 
 
 def run(args):
-    controller = Tilt(args.dead_zone)
+    wrist = args.command == 'wrist-tilt'
+    controller = WristTilt(args.dead_zone, args.full_speed_angle) if wrist else Tilt(args.dead_zone)
     tracker = log = None
-    window = 'MagicPointer finger tilt - no desktop input'
+    window = f'MagicPointer {"wrist" if wrist else "finger"} tilt - no desktop input'
     try:
         tracker = Tracker(args.model)
         with Cameras(args.camera, fps=args.fps) as cameras:
-            log = Log(args.output, {'camera': cameras.info, 'dead_zone_degrees': args.dead_zone})
-            print('Tilt experiment: SPACE neutral, D down range, R reset, Q save/exit. No OS input.')
-            print('Keep your palm steady and tilt the extended fingers at their base knuckles.')
+            metadata = {'camera': cameras.info, 'dead_zone_degrees': args.dead_zone}
+            if wrist:
+                metadata.update({'kind': 'wrist-tilt', 'measurement_frame': 'camera',
+                                 'full_speed_angle_degrees': args.full_speed_angle,
+                                 'note': 'Model-estimated camera-relative pitch; preview only. No images or OS input.'})
+            log = Log(args.output, metadata)
+            if wrist:
+                print('Wrist experiment: SPACE neutral, R reset, Q save/exit. No OS input.')
+                print('Point two straight fingers toward screen; tilt the whole hand at the wrist.')
+            else:
+                print('Tilt experiment: SPACE neutral, D down range, R reset, Q save/exit. No OS input.')
+                print('Keep your palm steady and tilt the extended fingers at their base knuckles.')
             start = previous = time.monotonic()
             offset, message, message_until = 1000., 'Hold each calibration pose steady for half a second', 0.
             while True:
@@ -112,7 +128,7 @@ def run(args):
                 result = controller.update(hand, now)
                 offset = max(0., min(50000., offset + result['lines_per_second']*34*min(now-previous, .1)))
                 previous = now
-                panel = render(frame.image, hand, result, offset, message if now < message_until else '')
+                panel = render(frame.image, hand, result, offset, message if now < message_until else '', wrist=wrist)
                 cv2.imshow(window, panel)
                 key = cv2.waitKey(1) & 255
                 action = None
@@ -120,8 +136,9 @@ def run(args):
                     if key == ord(' '):
                         action = 'neutral'
                         controller.capture_neutral()
-                        message = 'Neutral captured. Tilt fingers down, hold, then press D.'
-                    elif key == ord('d'):
+                        message = ('Neutral captured. Tilt the whole hand up/down; return to center to stop.' if wrist
+                                   else 'Neutral captured. Tilt fingers down, hold, then press D.')
+                    elif key == ord('d') and not wrist:
                         action = 'down'
                         controller.capture_down()
                         message = 'Range captured. Try neutral, down, up; then move/rotate the whole hand.'

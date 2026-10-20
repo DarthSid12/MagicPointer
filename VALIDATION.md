@@ -137,3 +137,21 @@ landmarks, angles and calibration events locally under ignored diagnostics/.
 passed on `2da63b7` for Windows and macOS with Python 3.11, including installation,
 dependency checks, tests, CLI startup and model inference. Physical-camera tilt
 comfort and reliability remain to be tested by the user.
+
+## Experiment 10.1: camera-relative wrist tilt
+
+Local regression suite: 59 tests, 58 passed, one Windows-only ABI check skipped.
+Tests cover whole-hand pitch response, yaw/translation/scale behavior, neutral
+roll, captured neutral with a symmetric 10-degree dead zone, up/down speed and
+capping, sideways/away/folded rejection, tracking loss, reset and invalid full-speed
+angles. A mocked wrist UI session verified separate archive kind/filename,
+metadata, no desktop construction and camera/tracker cleanup. Existing finger
+tilt tests continue to pass. Wrist CLI help and whitespace checks passed, and a
+1200-by-720 rendered preview was visually inspected for clipping and legibility.
+
+The command is `wrist-tilt`; the old `tilt` experiment and real `run` behavior
+are preserved. One steady neutral capture starts simulated scrolling, with no D
+calibration. The direction estimate uses model camera-frame landmarks rather
+than calibrated stereo geometry. No real camera, pointer events or near-lens
+reliability tests were run; the user must evaluate foreshortening, comfort and
+noise using the local wrist-tilt diagnostic archive.

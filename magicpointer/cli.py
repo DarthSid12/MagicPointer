@@ -63,6 +63,13 @@ def parser():
     cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))
     cmd.add_argument("--output", type=Path, default=Path("diagnostics"))
     cmd.add_argument("--dead-zone", type=positive, default=5., help="neutral dead zone in degrees (default: 5)")
+    cmd = commands.add_parser("wrist-tilt", help="whole-hand tilt toward screen; simulated scrolling only")
+    cmd.add_argument("--camera", type=camera, default=0)
+    cmd.add_argument("--fps", choices=("auto", "30", "60"), default="30")
+    cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))
+    cmd.add_argument("--output", type=Path, default=Path("diagnostics"))
+    cmd.add_argument("--dead-zone", type=positive, default=10., help="neutral half-width in degrees (default: +/-10)")
+    cmd.add_argument("--full-speed-angle", type=positive, default=30., help="angle from neutral for full speed (default: 30 degrees)")
     return root
 
 
@@ -81,7 +88,7 @@ def main(argv=None):
         if args.command == "collect":
             from .diagnostics import run
             return run(args)
-        if args.command == "tilt":
+        if args.command in ("tilt", "wrist-tilt"):
             from .tilt_app import run
             return run(args)
         if args.command == "calibrate":

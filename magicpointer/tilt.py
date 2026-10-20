@@ -59,6 +59,25 @@ def measure(hand):
     return math.degrees(math.atan2(y, x)), 'Two-finger shape valid'
 
 
+def measure_wrist(hand):
+    """Camera-relative finger direction: image Y down, negative Z toward camera.
+
+    This is a model estimate from one camera, not calibrated stereo orientation.
+    Shape validation is shared, but palm-relative pitch is not the control signal.
+    """
+    valid_pitch, reason = measure(hand)
+    if valid_pitch is None:
+        return None, reason
+    points = np.asarray(hand.world, dtype=float)
+    axes = [points[base+3]-points[base] for base in (5, 9)]
+    axis = sum(vector/np.linalg.norm(vector) for vector in axes)
+    axis /= np.linalg.norm(axis)
+    if -axis[2] < .25:
+        return None, 'Point the two fingers toward the screen/camera'
+    pitch = math.degrees(math.atan2(float(axis[1]), math.hypot(float(axis[0]), float(axis[2]))))
+    return pitch, 'Two-finger direction valid'
+
+
 class Tilt:
     def __init__(self, dead_zone=5.):
         if not math.isfinite(dead_zone) or not 0 < dead_zone < 30:
@@ -83,7 +102,7 @@ class Tilt:
             self.reset()
         if hand is not None and self.label is not None and hand.label != self.label:
             self.reset()
-        pitch, reason = measure(hand)
+        pitch, reason = self._measure(hand)
         self.current = pitch
         self.current_label = hand.label if hand is not None else None
         if pitch is None:
@@ -107,8 +126,12 @@ class Tilt:
 
     def _result(self, valid, reason, delta, speed):
         return {'valid': valid, 'reason': reason, 'raw_degrees': self.current,
+                'dead_zone_degrees': self.dead_zone,
                 'smoothed_degrees': self.filtered, 'delta_degrees': delta,
                 'lines_per_second': speed, 'phase': 'neutral' if self.neutral is None else ('down' if self.span is None else 'live')}
+
+    def _measure(self, hand):
+        return measure(hand)
 
     def _stable_pitch(self):
         if self.current is None or len(self.history) < 3 or self.history[-1][0]-self.history[0][0] < .30:
@@ -131,3 +154,18 @@ class Tilt:
         if not self.dead_zone+5 <= abs(delta) <= 65:
             raise ValueError(f'Tilt {self.dead_zone+5:g}-65 degrees from neutral, hold steady, then press D')
         self.span, self.direction = abs(delta), math.copysign(1., delta)
+
+
+class WristTilt(Tilt):
+    def __init__(self, dead_zone=10., full_speed_angle=30.):
+        super().__init__(dead_zone)
+        if not math.isfinite(full_speed_angle) or not dead_zone < full_speed_angle <= 60:
+            raise ValueError('Full-speed wrist angle must exceed the dead zone and be at most 60 degrees')
+        self.full_speed_angle = full_speed_angle
+
+    def _measure(self, hand):
+        return measure_wrist(hand)
+
+    def capture_neutral(self):
+        super().capture_neutral()
+        self.span, self.direction = self.full_speed_angle, 1.

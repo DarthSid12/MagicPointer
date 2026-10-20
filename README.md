@@ -161,6 +161,42 @@ Run `python -m magicpointer run --help` for details.
 
 ## Limits and development
 
+### Try wrist-tilt scrolling (experiment 10.1)
+
+```sh
+python -m magicpointer wrist-tilt --camera 0 --fps 30
+```
+
+Keep index and middle fingers straight, tuck the thumb and curl ring/little
+fingers. With the camera approximately level near the screen, point the two
+fingers toward the screen/camera in a comfortable neutral direction. Hold steady
+for half a second and press **Space**. This starts the simulated scroll controller
+immediately; no D calibration is needed.
+
+Tilt the **whole hand at the wrist**, keeping the fingers straight. Upward tilt
+scrolls up and downward tilt scrolls down. The neutral stop zone is **±10 degrees**
+from the captured direction. Speed ramps outside it to 12 simulated lines/second
+at 30 degrees from neutral in either direction, then stays capped. Try holding
+neutral and tilts in both directions without moving your arm through the room.
+The cross stays fixed while the virtual page moves.
+
+`--dead-zone 12` adjusts the stop zone and `--full-speed-angle 25` changes the
+angle needed for maximum speed. **Space** recaptures neutral, **R** resets, and
+**Q/Escape**, closing the window or Ctrl+C saves and exits. Invalid poses pause;
+loss/stalls over 0.30 seconds or a handedness change require neutral capture again.
+
+This is a **one-camera model estimate**, not calibrated stereo orientation. Depth
+and direction may be unstable when fingers point at the lens. The experiment
+rejects estimated directions facing sideways/away from the camera and displays
+the rejection reason. Physical accuracy, camera placement and comfort need live
+testing. The camera-frame depth convention is described in the
+[MediaPipe landmark interface](https://developers.google.cn/edge/api/mediapipe/js/tasks-vision.landmark).
+
+It sends no OS input and saves no images/audio/video. Share the printed
+`diagnostics/wrist-tilt-...zip` with observations; it records landmarks, estimated
+angle, calibration and simulated speed. The original `tilt` experiment and real
+`run` scrolling remain available with their previous behavior.
+
 ### Try finger-tilt scrolling
 
 ```sh
