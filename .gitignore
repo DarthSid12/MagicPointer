@@ -6,4 +6,5 @@ __pycache__/
 models/
 calibration*.json
 targets/
+diagnostics/
 .DS_Store

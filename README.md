@@ -161,6 +161,38 @@ Run `python -m magicpointer run --help` for details.
 
 ## Limits and development
 
+### Record gesture diagnostics
+
+If real poses become unrecognized when you rotate your hand, use the guided
+one-camera collector:
+
+```sh
+python -m magicpointer collect --camera 0 --fps 30
+```
+
+The window guides you through six gestures at five wrist angles (30 short clips).
+Use the same hand and typical room lighting/distance throughout a session. Keep
+only that hand in view. For each prompt, make the requested pose **first**, then
+press **Space** and hold it for three seconds. The expected pose is your manual
+label, independent of what the classifier predicts; keep recording even if it
+says unrecognized. Each new prompt waits for Space so transitions are not labelled
+as the next gesture. **S** skips a pose; **Q/Escape**, closing the window or Ctrl+C
+saves a partial session. Incomplete clips are marked in the summary.
+
+This mode never controls the pointer. It saves no photos, video or audio and
+uploads nothing. Files contain hand landmarks, timing, camera settings,
+handedness, predicted versus requested poses and the classifier's joint-angle,
+extension and thumb measurements. Handedness score is not gesture confidence.
+The on-screen state values are 1 extended, 0 curled, -1 uncertain.
+
+The terminal prints a timestamped `.zip` under `diagnostics/` containing
+`session.json`, `samples.jsonl`, and `summary.json`. Share that archive in this
+chat so the real failures can be measured and the classifier corrected. Different
+distances or hands should use separate sessions. `--seconds 5` records longer
+clips; `--output PATH` changes the local destination. The default diagnostics
+directory is excluded from Git. The existing thresholds remain unchanged until
+recordings support a correction; this tool does not itself fix recognition.
+
 The requested 12-foot range (3.6576 m) is a validation target, not a measured
 claim. Real control rejects wrists beyond that measured range. Resolution,
 lighting, exposure, camera spacing, occlusion and model quality affect results.

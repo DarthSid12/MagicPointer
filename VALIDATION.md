@@ -83,3 +83,15 @@ Camera privacy settings and launcher restart instructions. A mocked macOS failur
 regression verifies this guidance and resource cleanup. Local regression run:
 34 tests, 33 passed, 1 Windows-only check skipped. No system permissions were
 changed; actual permission grant and successful capture require user action.
+
+## Feature 9 / B2: guided real-hand diagnostics
+
+Local validation: 39 tests, 38 passed, 1 Windows-only ABI check skipped. Tests
+cover all six gestures/five orientations, raw measurement/classifier consistency,
+missing-hand denominators, summaries, unique sessions, archive contents and
+partial recording on quit. A mocked live collection exercised rendering and
+cleanup without constructing desktop input; the prompt rendering was visually
+inspected. CLI help and whitespace checks passed. Recognition thresholds and
+pose decisions are unchanged; their metrics are now exported by the classifier.
+No user hand recordings have yet been collected. B2 remains unfixed pending
+labelled samples and a measured recognition correction.

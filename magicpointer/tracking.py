@@ -18,24 +18,32 @@ def angle(a, b, c):
     return math.degrees(math.acos(max(-1., min(1., sum(x*y for x, y in zip(ab, cb)) / denominator))))
 
 
-def classify(points):
+def gesture_metrics(points):
+    """Expose the exact current classifier measurements for labelled recordings."""
     if len(points) != 21 or not all(math.isfinite(v) for p in points for v in p):
-        return Gesture.UNKNOWN
+        return {"valid": False, "reason": "invalid landmarks", "gesture": Gesture.UNKNOWN.value}
     palm = distance(points[0], points[9])
     if palm < 1e-6:
-        return Gesture.UNKNOWN
+        return {"valid": False, "reason": "degenerate palm", "gesture": Gesture.UNKNOWN.value}
     fingers = []
-    for mcp in (5, 9, 13, 17):
-        straight = angle(points[mcp], points[mcp+1], points[mcp+2]) > 155
-        straight &= angle(points[mcp+1], points[mcp+2], points[mcp+3]) > 150
+    measurements = {}
+    for name, mcp in zip(("index", "middle", "ring", "little"), (5, 9, 13, 17)):
+        pip = angle(points[mcp], points[mcp+1], points[mcp+2])
+        dip = angle(points[mcp+1], points[mcp+2], points[mcp+3])
+        reach = distance(points[mcp+3], points[0]) / max(distance(points[mcp], points[0]), 1e-12)
+        curl = distance(points[mcp+3], points[0]) / max(distance(points[mcp+1], points[0]), 1e-12)
+        straight = pip > 155 and dip > 150
         extended = straight and distance(points[mcp+3], points[0]) > distance(points[mcp], points[0]) * 1.25
         curled = distance(points[mcp+3], points[0]) < distance(points[mcp+1], points[0]) * 1.05
         fingers.append(1 if extended else (0 if curled else -1))
-    thumb_straight = angle(points[2], points[3], points[4]) > 150
+        measurements[name] = {"pip_degrees": pip, "dip_degrees": dip, "reach_ratio": reach,
+                              "curl_ratio": curl, "state": fingers[-1]}
+    thumb_angle = angle(points[2], points[3], points[4])
+    thumb_straight = thumb_angle > 150
     separation = distance(points[4], points[5]) / palm
     thumb = 1 if thumb_straight and separation > .65 else (0 if separation < .55 else -1)
     signature = (thumb, *fingers)
-    return {
+    gesture = {
         (0, 0, 0, 0, 0): Gesture.FIST,
         (0, 1, 0, 0, 0): Gesture.POINT,
         (1, 1, 0, 0, 0): Gesture.LEFT,
@@ -43,6 +51,13 @@ def classify(points):
         (0, 1, 1, 0, 0): Gesture.SCROLL,
         (1, 1, 1, 1, 1): Gesture.PALM,
     }.get(signature, Gesture.UNKNOWN)
+    return {"valid": True, "palm_size": palm, "fingers": measurements,
+            "thumb": {"ip_degrees": thumb_angle, "separation_ratio": separation, "state": thumb},
+            "signature": list(signature), "gesture": gesture.value}
+
+
+def classify(points):
+    return Gesture(gesture_metrics(points)["gesture"])
 
 
 @dataclass
@@ -51,6 +66,8 @@ class Hand:
     world: object
     label: str
     gesture: Gesture
+    handedness_score: float = None
+    image_landmarks: object = None
 
 
 class Tracker:
@@ -79,7 +96,9 @@ class Tracker:
         height, width = image.shape[:2]
         pixels = np.array([(p.x * width, p.y * height) for p in result.hand_landmarks[0]])
         world = [(p.x, p.y, p.z) for p in result.hand_world_landmarks[0]]
-        return Hand(pixels, world, result.handedness[0][0].category_name, classify(world))
+        category = result.handedness[0][0]
+        normalized = [(p.x, p.y, p.z) for p in result.hand_landmarks[0]]
+        return Hand(pixels, world, category.category_name, classify(world), category.score, normalized)
 
     def close(self):
         self.detector.close()

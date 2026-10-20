@@ -51,6 +51,12 @@ def parser():
     cmd = commands.add_parser("cameras", help="probe camera indices and report negotiated settings")
     cmd.add_argument("--limit", type=camera, default=4)
     cmd.add_argument("--fps", choices=("auto", "30", "60"), default="auto")
+    cmd = commands.add_parser("collect", help="guided one-camera gesture diagnostics; no desktop input or video recording")
+    cmd.add_argument("--camera", type=camera, default=0)
+    cmd.add_argument("--fps", choices=("auto", "30", "60"), default="30")
+    cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))
+    cmd.add_argument("--output", type=Path, default=Path("diagnostics"))
+    cmd.add_argument("--seconds", type=positive, default=3., help="recording length for each labelled pose (default: 3 seconds)")
     return root
 
 
@@ -65,6 +71,9 @@ def main(argv=None):
             raise ValueError("Select different left and right camera indices")
         if args.command == "run":
             from .app import run
+            return run(args)
+        if args.command == "collect":
+            from .diagnostics import run
             return run(args)
         if args.command == "calibrate":
             from .calibration import run
