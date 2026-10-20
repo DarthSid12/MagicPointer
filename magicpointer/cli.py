@@ -1,0 +1,92 @@
+"""Startup stays usable even when vision libraries or camera devices are absent."""
+import argparse
+import math
+from pathlib import Path
+import sys
+
+from . import __version__
+
+
+def positive(value):
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("must be a positive finite number")
+    return number
+
+
+def camera(value):
+    number = int(value)
+    if number < 0:
+        raise argparse.ArgumentTypeError("camera index cannot be negative")
+    return number
+
+
+def parser():
+    root = argparse.ArgumentParser(description="MagicPointer: Windows-first stereo hand pointer")
+    root.add_argument("--version", action="version", version=__version__)
+    commands = root.add_subparsers(dest="command")
+    for name in ():
+        cmd = commands.add_parser(name)
+        cmd.add_argument("--left", type=camera, default=0, help="primary camera index (default: 0)")
+        cmd.add_argument("--right", type=camera, required=name == "calibrate", help="secondary camera index")
+        cmd.add_argument("--fps", choices=("auto", "30", "60"), default="auto", help="requested capture rate; driver may negotiate a lower rate")
+        cmd.add_argument("--calibration", type=Path, default=Path("calibration.json"))
+        if name == "run":
+            cmd.add_argument("--debug", action="store_true", help="camera + virtual cursor preview, no OS input; one camera supported")
+            cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))
+            cmd.add_argument("--workspace-width", type=positive, default=.40, help="local interaction plane width, metres (default: 0.40)")
+            cmd.add_argument("--workspace-height", type=positive, default=.25, help="local interaction plane height, metres (default: 0.25)")
+            cmd.add_argument("--mirror-x", action=argparse.BooleanOptionalAction, default=True)
+            cmd.add_argument("--mute", action="store_true")
+        else:
+            cmd.add_argument("--square-mm", type=positive, default=25., help="measured checkerboard square edge in mm")
+            cmd.add_argument("--marker-size", type=positive, required=True, help="measured wall marker black square edge in metres")
+            cmd.add_argument("--marker-spacing", type=positive, required=True, help="measured wall marker center-to-center distance in metres")
+    cmd = commands.add_parser("download-model", help="download checksum-verified official hand model")
+    cmd.add_argument("--output", type=Path, default=Path("models/hand_landmarker.task"))
+    return root
+
+
+def main(argv=None):
+    root = parser()
+    args = root.parse_args(argv)
+    if args.command is None:
+        root.print_help()
+        return 0
+    try:
+        if args.command in ("run", "calibrate") and args.left == args.right:
+            raise ValueError("Select different left and right camera indices")
+        if args.command == "run":
+            from .app import run
+            return run(args)
+        if args.command == "calibrate":
+            from .calibration import run
+            return run(args)
+        if args.command == "targets":
+            from .calibration import targets
+            targets(args.output, args.square_mm, args.marker_mm)
+            print(f"Targets saved in {args.output}. Print at 100%; measure the printed sizes.")
+        elif args.command == "download-model":
+            from .model import download
+            print(f"Model saved to {download(args.output)}")
+        elif args.command == "cameras":
+            from .cameras import Cameras
+            found = 0
+            for index in range(args.limit):
+                try:
+                    with Cameras(index, fps=args.fps) as devices:
+                        print(devices.info[0])
+                        found += 1
+                except ValueError as error:
+                    print(str(error))
+            return 0 if found else 1
+        return 0
+    except KeyboardInterrupt:
+        print("\nStopped")
+        return 0
+    except ImportError as error:
+        print(f"Dependency unavailable: {error}. Install with: python -m pip install -e .", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"MagicPointer: {error}", file=sys.stderr)
+        return 1

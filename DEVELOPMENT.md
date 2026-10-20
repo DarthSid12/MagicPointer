@@ -32,29 +32,31 @@ running on macOS does not establish that Windows input injection works.
 The physical accuracy checks require the user's rig. Synthetic tests can verify
 geometry and event ordering, but cannot establish long-range recognition quality.
 
-## Decisions required before dependent implementation
+## Confirmed decisions
 
-- GitHub owner, repository name, and visibility. Local Git initialization and
-  planning can proceed independently; remote creation cannot.
-- Camera models, resolution/FPS, baseline and mounting arrangement. Calibration
-  must estimate camera intrinsics, lens distortion and relative pose; knowing the
-  baseline alone does not supply these quantities.
-- Whether a printed checkerboard visible to both cameras is acceptable for
-  calibration. Changing the mount or camera capture geometry invalidates the rig
-  calibration. Startup user/workspace calibration is a separate concern.
-- Whether cursor mapping uses hand position in a screen-facing interaction plane
-  or the pointing direction of the index finger. These need different calibration
-  and geometry and have different behavior when the wrist rotates.
-- Whether raising a fist means entering a calibrated activation region or
-  recognizing an upward arm movement. A hand-only detector does not establish
-  arm position.
+- The user owns the existing remote at
+  https://github.com/Himir-Desai/MagicPointer. The checkout belongs to local user
+  `himirdesai`; commits use the configured Himir Desai identity. Development is on
+  `feat/pointer-runtime`, based on the initial planning commit on `main`.
+- Two 1080p cameras; expose auto/30/60 FPS selection and report driver-negotiated
+  settings. The physical models, achievable rate and baseline remain to be tested.
+- User approved square ArUco wall markers plus a temporarily moved checkerboard.
+  Generated targets use ArUco dictionary DICT_4X4_50, IDs 0 and 1, and a checkerboard
+  with 9 by 6 inner corners. Printed dimensions and marker spacing are supplied at
+  calibration time. Startup verifies the saved rig against the wall markers.
+- A closed fist may activate anywhere in the shared camera view. No arm/body
+  detector or fixed activation zone is required.
+- Position of the index tip, including whole-hand movement, drives a local plane
+  parallel to the camera image plane. Its origin is the activation fist wrist.
+  The default physical workspace is 0.40 by 0.25 m and may be changed at startup.
 
-## Proposed technical direction (subject to feasibility checks)
+## Implemented technical direction
 
 Python with OpenCV for camera capture/calibration and MediaPipe Hand Landmarker
-for hand landmarks is a candidate. Verify Windows package compatibility and pin
-versions before selecting the runtime and installing dependencies. Do not treat
-model-relative hand coordinates as calibrated stereo depth.
+for hand landmarks. Direct dependencies are pinned in pyproject.toml. Windows
+uses native Win32 input; macOS Quartz support is an optional extra. Model-relative
+hand coordinates classify gestures; calibrated paired observations supply metric
+depth. Physical-platform validation is still required.
 
 Use measured paired camera observations to reconstruct points in a fixed rig
 coordinate system. Associate the same hand across views and reject inconsistent
@@ -65,6 +67,23 @@ Use a deterministic gesture state engine with temporal stabilization. Full palm
 must deactivate before other actions. A stable right-click chord must be resolved
 before committing a thumb-only left click or two-finger scroll. The exact timing
 thresholds need hands-on tuning and should be documented when implemented.
+
+Implemented initial timings: fist activation 0.45 s, gesture confirmation 0.18 s,
+tracking loss 0.30 s. Clicks latch until a stable index-only or fist pose; a right
+click cannot fall through into scrolling as its thumb closes. Chord fingers must
+be opened within the stabilization interval to avoid being accepted separately.
+Unknown/missing observations produce no OS input. Control is limited to the
+primary display; debug mode always uses a virtual cursor.
+
+## Rollback checkpoints
+
+The implementation is committed in feature order, with a runnable CLI at the
+foundation checkpoint, calibration tools at checkpoint 2, a camera preview at
+checkpoint 3, then activation, movement, clicks, scrolling and palm deactivation.
+Earlier checkpoints expose only commands implemented at that checkpoint. Later
+gesture behaviors are added to the engine in their own commits. The final phase
+validates each staged checkpoint before its commit and the combined application.
+Hardware validation is explicitly pending rather than represented as passed.
 
 ## Range and orientation validation
 

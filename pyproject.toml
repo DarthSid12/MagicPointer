@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "magicpointer"
+version = "0.1.0"
+description = "Windows-first stereo hand pointer with single-camera diagnostics"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+  "numpy==1.26.4",
+  "opencv-contrib-python==4.11.0.86",
+  "mediapipe==0.10.32",
+]
+
+[project.optional-dependencies]
+macos = [
+  "pyobjc-core==10.3.2; sys_platform == 'darwin'",
+  "pyobjc-framework-Cocoa==10.3.2; sys_platform == 'darwin'",
+  "pyobjc-framework-Quartz==10.3.2; sys_platform == 'darwin'",
+]
+
+[project.scripts]
+magicpointer = "magicpointer.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["magicpointer*"]
