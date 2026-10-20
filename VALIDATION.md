@@ -110,3 +110,8 @@ Local regression suite: 43 tests, 42 passed, one Windows-only ABI check skipped.
 No cameras or pointer events were used. Real-time replay, natural transitions,
 false click rates, stereo control and other users still require live validation.
 B2 remains open for live confirmation and remaining pointing uncertainty.
+
+[B2 CI run 39486515772](https://github.com/Himir-Desai/MagicPointer/actions/runs/39486515772)
+passed on commit `c59a8cf` for Windows and macOS with Python 3.11: package install,
+dependency checks, regression suite, CLI help, model download and blank-frame
+inference. These hosted checks do not establish live recognition accuracy.
