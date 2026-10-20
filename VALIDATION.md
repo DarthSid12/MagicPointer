@@ -75,3 +75,11 @@ These hosted checks use synthetic frames and do not send real pointer events.
    false/missed gestures, jitter, latency, processing FPS and occlusion behavior.
    Adjust thresholds only against measured results; do not label range/orientation
    support verified until this session passes.
+
+## B1: macOS camera authorization guidance
+
+The reported first-use camera authorization failure now provides Allow/rerun,
+Camera privacy settings and launcher restart instructions. A mocked macOS failure
+regression verifies this guidance and resource cleanup. Local regression run:
+34 tests, 33 passed, 1 Windows-only check skipped. No system permissions were
+changed; actual permission grant and successful capture require user action.

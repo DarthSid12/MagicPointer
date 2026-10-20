@@ -36,6 +36,19 @@ needs Accessibility permission in System Settings, followed by a restart of the
 terminal/app. Debug mode does not request desktop input permission. Windows uses
 native input APIs, with no macOS-only dependencies in the default installation.
 
+If OpenCV prints `not authorized to capture video (status 0)` on macOS, the
+camera permission request has not completed. Choose **Allow** in the macOS
+prompt, then rerun the command. If it still fails, open **System Settings →
+Privacy & Security → Camera**, enable the app launching Python (such as VS Code,
+Terminal, or iTerm), then fully quit and reopen that app. An IDE's integrated
+terminal may use the IDE's permission rather than Terminal's. Reopen this project
+and retry the debug command below. The program cannot grant itself camera access.
+If permission is already enabled, check the device connection and camera index.
+
+The initial Matplotlib font-cache message, GPU/Metal information, XNNPACK CPU
+delegate message and feedback-tensor warnings do not explain this permission
+failure; the model has initialized before the camera is opened.
+
 ## Try one camera first
 
 ```sh

@@ -37,6 +37,19 @@ class StartupTests(unittest.TestCase):
                 Cameras(0)
             capture.return_value.release.assert_called_once()
 
+    def test_macos_camera_failure_explains_first_permission_prompt(self):
+        with patch('magicpointer.cameras.platform.system', return_value='Darwin'), \
+                patch('cv2.VideoCapture') as capture:
+            capture.return_value.isOpened.return_value = False
+            with self.assertRaises(ValueError) as failure:
+                Cameras(0)
+            message = str(failure.exception)
+            self.assertIn('choose Allow and rerun', message)
+            self.assertIn('Privacy & Security > Camera', message)
+            self.assertIn('VS Code, Terminal, or iTerm', message)
+            self.assertIn('Quit and reopen', message)
+            capture.return_value.release.assert_called_once()
+
     def test_second_camera_failure_releases_both(self):
         from unittest.mock import MagicMock
         import numpy as np

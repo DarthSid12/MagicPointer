@@ -24,7 +24,18 @@ class Cameras:
                 cap = cv2.VideoCapture(index, backend)
                 self.captures.append(cap)
                 if not cap.isOpened():
-                    raise ValueError(f"Cannot open camera {index}. Check its index and camera permissions.")
+                    message = f"Cannot open camera {index}. "
+                    if platform.system() == "Darwin":
+                        message += (
+                            "If macOS just requested camera access, choose Allow and rerun the command. "
+                            "Open System Settings > Privacy & Security > Camera and enable the app "
+                            "running Python (for example VS Code, Terminal, or iTerm). "
+                            "Quit and reopen that app after changing permission. "
+                            "If access is already enabled, check the camera index and connection."
+                        )
+                    else:
+                        message += "Check its index and camera permissions."
+                    raise ValueError(message)
                 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
