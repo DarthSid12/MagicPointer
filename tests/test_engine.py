@@ -42,6 +42,24 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(events[-1].value, (0.5, 0.5))
         self.assertEqual(self.hold(Gesture.FIST), [])
 
+    def test_click_chord_settles_without_left_or_scroll(self):
+        self.activate()
+        self.hold(Gesture.POINT, 0.3)
+        before = self.hold(Gesture.LEFT, 0.12)
+        events = before + self.hold(Gesture.RIGHT, 0.6)
+        self.assertEqual([e.value for e in events if e.kind == 'click'], ['right'])
+        self.assertFalse(any((e.kind == 'scroll' for e in events)))
+        self.assertFalse(any((e.kind == 'scroll' for e in self.hold(Gesture.SCROLL, 0.4, tip=(0.0, 0.1, 2.0)))))
+        self.assertFalse(any((e.kind == 'click' for e in self.hold(Gesture.LEFT))))
+
+    def test_click_requires_neutral_before_repeat(self):
+        self.activate()
+        events = self.hold(Gesture.LEFT, 1.0)
+        self.assertEqual([e.kind for e in events].count('click'), 1)
+        self.hold(Gesture.POINT, 0.3)
+        events = self.hold(Gesture.LEFT, 0.3)
+        self.assertEqual([e.kind for e in events].count('click'), 1)
+
     def test_loss_suppresses_actions_and_clears_origin(self):
         self.activate()
         self.assertEqual(self.sample(None), [])

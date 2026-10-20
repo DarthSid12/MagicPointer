@@ -111,4 +111,7 @@ class Engine:
             events.append(Event("move", self.cursor))
         if elapsed < self.dwell:
             return events
+        if gesture in (Gesture.LEFT, Gesture.RIGHT) and not self._action_latched:
+            self._action_latched = True
+            events.append(Event("click", "left" if gesture == Gesture.LEFT else "right"))
         return events
