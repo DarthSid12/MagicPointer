@@ -13,7 +13,7 @@ accuracy. See VALIDATION.md for completed checks and outstanding acceptance test
 | 5 | Index-tip pointer movement in a local metric workspace | Implemented prototype; software checks pass; physical Windows validation pending | 0 | 5: Initial request and development plan; user confirmed camera/calibration and anywhere-in-view activation. Feature 5 implementation checkpoint validated and committed in this initial development sequence. |
 | 6 | Thumb left click and thumb-plus-middle right click | Implemented prototype; software checks pass; physical Windows validation pending | 0 | 6: Initial request and development plan; user confirmed camera/calibration and anywhere-in-view activation. Feature 6 implementation checkpoint validated and committed in this initial development sequence. |
 | 7 | Index-plus-middle vertical scrolling | Implemented prototype; software checks pass; physical Windows validation pending | 0 | 7: Initial request and development plan; user confirmed camera/calibration and anywhere-in-view activation. Feature 7 implementation checkpoint validated and committed in this initial development sequence. |
-| 8 | Full-palm deactivation and distinct deactivation chime | Planned; requirements confirmed | 0 | 8: Initial request and development plan; user confirmed camera/calibration and anywhere-in-view activation. |
+| 8 | Full-palm deactivation and distinct deactivation chime | Implemented prototype; software checks pass; physical Windows validation pending | 0 | 8: Initial request and development plan; user confirmed camera/calibration and anywhere-in-view activation. Feature 8 implementation checkpoint validated and committed in this initial development sequence. |
 
 Next major prompt number: **9**.
 

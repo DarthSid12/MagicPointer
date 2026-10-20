@@ -1,0 +1,19 @@
+name: Validate
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e .
+      - run: python -m pip check
+      - run: python -m unittest discover -s tests -v
+      - run: python -m magicpointer --help
+      - run: python -m magicpointer download-model
+      - run: python -c "from magicpointer.tracking import Tracker; import numpy as np; t=Tracker('models/hand_landmarker.task'); assert t.detect(np.zeros((480,640,3),dtype=np.uint8),1.) is None; t.close()"

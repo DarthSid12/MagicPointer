@@ -96,6 +96,9 @@ class Engine:
                 self._action_latched = False
                 return [Event("activate"), Event("move", self.cursor)]
             return []
+        # Stop motion immediately on a palm candidate, then confirm the transition.
+        if gesture == Gesture.PALM:
+            return self._stop("open palm") if elapsed >= self.dwell else []
         if gesture in (Gesture.FIST, Gesture.POINT) and elapsed >= self.dwell:
             self._action_latched = False
         events = []
