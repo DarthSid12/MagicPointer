@@ -32,7 +32,8 @@ def parser():
         cmd.add_argument("--fps", choices=("auto", "30", "60"), default="auto", help="requested capture rate; driver may negotiate a lower rate")
         cmd.add_argument("--calibration", type=Path, default=Path("calibration.json"))
         if name == "run":
-            cmd.add_argument("--debug", action="store_true", help="camera + virtual cursor preview, no OS input; one camera supported")
+            cmd.add_argument("--debug", action="store_true", help="camera + virtual cursor preview with automatic diagnostic recording; no OS input")
+            cmd.add_argument("--output", type=Path, default=Path("diagnostics"), help="debug-session recording directory (default: diagnostics)")
             cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))
             cmd.add_argument("--workspace-width", type=positive, default=.40, help="local interaction plane width, metres (default: 0.40)")
             cmd.add_argument("--workspace-height", type=positive, default=.25, help="local interaction plane height, metres (default: 0.25)")

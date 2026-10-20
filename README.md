@@ -61,6 +61,23 @@ pointer**. Gray is inactive, green active, purple click feedback, blue scrolling
 and orange unavailable tracking. The feed is the raw camera view; horizontal
 pointer mapping is mirrored by default for a user facing the TV.
 
+Every `run --debug` session now automatically records diagnostic data from start
+to exit, including frames with no detected hand. A REC label appears in the
+preview. On Q, Escape, window close, Ctrl+C or a handled runtime error, it saves
+`diagnostics/debug-<UTC timestamp>-<unique id>.zip` and prints the archive path.
+Use `run --debug --output PATH` to choose another directory. Both one-camera and
+stereo debug runs are recorded; normal desktop-control runs are not recorded.
+
+The ZIP contains `session.json`, `samples.jsonl` and `summary.json`: camera settings,
+timestamps, both cameras' landmark/pose estimates when applicable, thumb/finger
+metrics, accepted observations or rejection reasons, pointer state, scroll neutral
+and angle, and simulated input events. These recordings currently contain no
+camera images, video or audio. Data stays local; share the ZIP for diagnosis.
+The uncompressed session folder is retained, and samples are flushed each frame;
+a forced process kill may leave that folder without a finalized ZIP. The `tilt`
+and `wrist-tilt` experiments continue saving their existing recordings; `collect`
+continues recording the labelled intervals selected with Space.
+
 Mono preview estimates scale from palm size at activation. It cannot measure
 stereo depth or establish 12-foot accuracy. Only one hand is tracked per view.
 Keep other hands out of view while controlling the pointer.

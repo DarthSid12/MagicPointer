@@ -1,4 +1,5 @@
-from types import SimpleNamespace
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -11,7 +12,7 @@ from magicpointer.engine import Gesture
 from magicpointer.tracking import Hand
 
 
-def debug_session(poses=None):
+def debug_session(poses=None, output=None, resources=None):
     """Exercise actual render/engine/dispatch loop, with synthetic camera input."""
     args = parser().parse_args(['run', '--debug', '--mute'])
     poses = poses or [Gesture.FIST]*12 + [Gesture.POINT]*5 + [Gesture.LEFT]*8 + [Gesture.POINT]*5 + [Gesture.PALM]*8
@@ -35,6 +36,8 @@ def debug_session(poses=None):
 
     def detect(*_):
         pose = poses[min(index[0], len(poses)-1)]
+        if pose is None:
+            return None
         if isinstance(pose, Hand):
             pose.pixels = pixels.copy()
             return pose
@@ -44,13 +47,17 @@ def debug_session(poses=None):
         index[0] += 1
         return ord('q') if index[0] >= len(poses) else -1
 
+    if resources is not None:
+        resources.update(tracker=tracker, camera=camera, audio=audio)
     camera.read.side_effect = read
     tracker.detect.side_effect = detect
-    with patch.object(app, 'Cameras', return_value=camera), patch.object(app, 'Tracker', return_value=tracker), \
+    with tempfile.TemporaryDirectory() as directory, \
+            patch.object(app, 'Cameras', return_value=camera), patch.object(app, 'Tracker', return_value=tracker), \
             patch.object(app, 'Chimes', return_value=audio), patch.object(app.time, 'monotonic', side_effect=tick), \
             patch.object(app.cv2, 'imshow', side_effect=lambda _, panel: displays.append(panel.copy())), \
             patch.object(app.cv2, 'waitKey', side_effect=key), patch.object(app.cv2, 'getWindowProperty', return_value=1), \
             patch.object(app.cv2, 'destroyAllWindows'), patch('magicpointer.desktop.Desktop') as desktop:
+        args.output = Path(output or directory)
         result = app.run(args)
         desktop.assert_not_called()
     return result, displays, tracker, camera, audio
@@ -72,9 +79,12 @@ class AppTests(unittest.TestCase):
         args = parser().parse_args(['run', '--debug'])
         camera, tracker, audio = MagicMock(), MagicMock(), MagicMock()
         camera.__enter__.return_value = camera
+        camera.info = [{'index': 0}]
         camera.read.side_effect = ValueError('Camera disconnected')
-        with patch.object(app, 'Cameras', return_value=camera), patch.object(app, 'Tracker', return_value=tracker), \
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(app, 'Cameras', return_value=camera), patch.object(app, 'Tracker', return_value=tracker), \
                 patch.object(app, 'Chimes', return_value=audio), patch.object(app.cv2, 'destroyAllWindows'):
+            args.output = Path(directory)
             with self.assertRaisesRegex(ValueError, 'disconnected'):
                 app.run(args)
         tracker.close.assert_called_once()

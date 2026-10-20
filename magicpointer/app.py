@@ -6,6 +6,7 @@ import numpy as np
 from .audio import Chimes
 from .cameras import Cameras
 from .engine import Engine, Gesture, Observation
+from .debug_log import DebugLog
 from .stereo import Stereo
 from .tracking import Tracker, distance, gesture_metrics
 from .tilt import measure_wrist, direction_pitch
@@ -78,6 +79,7 @@ def run(args):
     engine = Engine(width=args.workspace_width * (10 if stereo is None else 1),
                     height=args.workspace_height * (10 if stereo is None else 1), mirror_x=args.mirror_x)
     trackers, audio, desktop = [], None, None
+    log = None
     window = "MagicPointer - Q / Escape stops"
     current_label = None
     mono_scale = 1.
@@ -85,6 +87,14 @@ def run(args):
     next_marker_check = 0.
     previous_wrist, previous_wrist_time = None, None
     try:
+        if args.debug:
+            log = DebugLog(args.output, {'camera_indices': [args.left] + ([args.right] if stereo else []),
+                           'requested_fps': args.fps, 'stereo': stereo is not None,
+                           'workspace_width': engine.width, 'workspace_height': engine.height,
+                           'mirror_x': engine.mirror_x, 'coordinate_units': 'metres' if stereo else 'activation_palm_sizes',
+                           'dwell_seconds': engine.dwell, 'activation_dwell_seconds': engine.activation_dwell,
+                           'loss_timeout_seconds': engine.loss_timeout,
+                           'termination': 'normal'})
         # Verify model/dependencies before opening camera devices.
         trackers.append(Tracker(args.model))
         if stereo:
@@ -94,6 +104,8 @@ def run(args):
             desktop = Desktop()
         audio = Chimes(args.mute)
         with Cameras(args.left, args.right, args.fps) as cameras:
+            if log:
+                log.metadata["cameras"] = cameras.info
             print("Camera negotiated settings:", cameras.info)
             print("DEBUG: preview only; no OS pointer input" if args.debug else "STEREO CONTROL: Q/Escape or close window to stop")
             print("Hold fist 0.45 s to activate; hold gestures 0.18 s. Return to index-only between clicks.")
@@ -135,7 +147,8 @@ def run(args):
                         observation, reason = None, "Hand moved too abruptly; reacquire"
                 if observation is not None:
                     previous_wrist, previous_wrist_time = observation.wrist, now
-                events = engine.step(observation, time.monotonic())
+                engine_now = time.monotonic()
+                events = engine.step(observation, engine_now)
                 for event in events:
                     if event.kind == "activate":
                         current_label = left.label
@@ -160,6 +173,9 @@ def run(args):
                     state = "scroll"
                 elif now < action_until:
                     state = "click"
+                if log:
+                    log.append(frames, hands, observation, engine, events, engine_now,
+                               reason=reason, paired=paired, verified=verified, state=state)
                 color = COLORS[state]
                 if args.debug:
                     panel = frames[0].image.copy()
@@ -180,6 +196,8 @@ def run(args):
                         feedback = (f"Wrist scroll: {scroll.delta:+.1f} deg | {scroll.speed:+.1f}/s (down +)"
                                     if scroll.delta is not None else "Scroll paused: restore two-finger pose")
                     lines.append(feedback + " | Index-only exits")
+                if log:
+                    lines.append("REC: diagnostic data (auto-saved on exit)")
                 for i, line in enumerate(lines):
                     cv2.putText(panel, line, (15, 27+i*26), cv2.FONT_HERSHEY_SIMPLEX, .58, (0, 0, 0), 4)
                     cv2.putText(panel, line, (15, 27+i*26), cv2.FONT_HERSHEY_SIMPLEX, .58, color, 1)
@@ -196,11 +214,20 @@ def run(args):
                 count += 1
                 if now - start >= 1:
                     measured_fps, start, count = count/(now-start), now, 0
+    except BaseException as error:
+        if log:
+            log.metadata['termination'] = type(error).__name__
+            log.metadata['error'] = str(error)
+        raise
     finally:
-        if audio:
-            if engine.active:
-                audio.play(False)
-            audio.close()
-        for tracker in trackers:
-            tracker.close()
-        cv2.destroyAllWindows()
+        try:
+            if log:
+                log.close()
+        finally:
+            if audio:
+                if engine.active:
+                    audio.play(False)
+                audio.close()
+            for tracker in trackers:
+                tracker.close()
+            cv2.destroyAllWindows()

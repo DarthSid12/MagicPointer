@@ -243,3 +243,23 @@ neutrals, confirming reset on every entry. Neutral uses at least 300 ms of stabl
 samples after mode entry, rather than a persisted angle or the first frame alone.
 No camera/OS input or full regression suite was run for this documentation-only
 clarification; the probes used the unchanged, previously validated engine.
+
+## Feature 11: automatic main-debug diagnostic recording
+
+All valid `run --debug` sessions now create a unique local debug directory and
+record continuous samples for mono or stereo preview. Existing tilt experiment
+recordings and labelled collection intervals retain their formats. The common
+diagnostic-data component is implemented independently of the pending user choice
+about additionally saving camera video. No image/video/audio capture was added.
+
+Local checks: 80 tests run, 79 passed, one Windows-only ABI test skipped. New
+coverage checks full-session recording including no-hand frames, actual simulated
+scroll events and neutral changes, both-camera data and rejection reasons,
+nonfinite landmark serialization, flushed samples before close, idempotent
+archiving, Ctrl+C/capture/model errors, resource cleanup when archiving fails,
+and no recorder for normal desktop-control runs. An existing camera-failure
+fixture was updated to supply realistic camera metadata. CLI help and whitespace
+checks passed. A synthetic main-preview frame was rendered and visually inspected
+for the REC indicator. No live camera capture, OS input or disk-throughput/long-run
+performance measurements were performed. Data is flushed per frame; a hard kill
+may leave the session folder without its final ZIP.
