@@ -230,3 +230,16 @@ no ordinary click-classifier threshold has been changed.
 passed on `fe2a60c` for Windows and macOS with Python 3.11: dependency installation,
 regression suite, CLI startup, official model download and blank-frame inference.
 Physical stereo cameras and live OS scrolling were not exercised by CI.
+
+
+## Features 6/7 clarification: B7 entry timing and fresh neutral
+
+Read-only deterministic engine probes with 20-ms samples confirmed one right-click
+for simultaneous index/middle/thumb recognition and for an 80-ms two-finger
+intermediate. A 240-ms two-finger intermediate latched scrolling first and emitted
+no click when the thumb chord followed. This is B7; no runtime fix is included.
+Separate entries at +18 and -12 degrees captured +18 and -12 as their respective
+neutrals, confirming reset on every entry. Neutral uses at least 300 ms of stable
+samples after mode entry, rather than a persisted angle or the first frame alone.
+No camera/OS input or full regression suite was run for this documentation-only
+clarification; the probes used the unchanged, previously validated engine.
