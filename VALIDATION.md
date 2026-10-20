@@ -263,3 +263,9 @@ checks passed. A synthetic main-preview frame was rendered and visually inspecte
 for the REC indicator. No live camera capture, OS input or disk-throughput/long-run
 performance measurements were performed. Data is flushed per frame; a hard kill
 may leave the session folder without its final ZIP.
+
+[Feature 11 CI run 39495901172](https://github.com/Himir-Desai/MagicPointer/actions/runs/39495901172)
+passed on `9d8547b` for Windows and macOS with Python 3.11, including installation,
+dependency checks, regression tests, CLI startup, model download and blank-frame
+inference. Live recording performance and optional camera-video recording remain
+outside these checks; the video preference is still awaiting the user's answer.
