@@ -175,3 +175,8 @@ experiment semantics, retained fist/full-palm rejection and offline replay.
 Remaining no-hand, folded-finger and direction failures are still rejected. See
 reports/B5-wrist-analysis.md and reports/B5-wrist-replay.json for the source hash,
 calibration events, exact aggregates and live-test limitations.
+
+[B5 CI run 39492043757](https://github.com/Himir-Desai/MagicPointer/actions/runs/39492043757)
+passed on `91c798b` for Windows and macOS with Python 3.11: installation,
+dependencies, regression tests, CLI startup and model inference. Live wrist
+tracking and intended-direction accuracy remain to be confirmed by the user.
