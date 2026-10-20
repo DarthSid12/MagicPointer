@@ -1,0 +1,86 @@
+{
+  "sessions": [
+    {
+      "filename": "tilt-20261020T200538Z-01a0d29f.zip",
+      "sha256": "b783d1b7e696573728c137c252368e499cb3ee3e1c53d9378a3f4d2f3789abc4",
+      "frames": 4639,
+      "valid_shape_frames": 4039,
+      "reasons": {
+        "No hand": 265,
+        "Keep index and middle fingers extended": 157,
+        "Tuck thumb and curl ring/little fingers": 178,
+        "Two-finger shape valid": 4039
+      },
+      "fist_labelled_invalid_frames": 154,
+      "calibrations": [
+        {
+          "neutral_degrees": 26.530197937259913,
+          "down_span_degrees": 49.10195233598523,
+          "down_sign": 1.0,
+          "valid_live_frames": 469,
+          "minimum_delta_degrees": -13.610218196248411,
+          "maximum_delta_degrees": 54.73714372064427,
+          "maximum_up_lines_per_second": 2.342812798123549,
+          "maximum_down_lines_per_second": 12.0
+        },
+        {
+          "neutral_degrees": 51.7772235688268,
+          "down_span_degrees": 44.258064520652624,
+          "down_sign": 1.0,
+          "valid_live_frames": 266,
+          "minimum_delta_degrees": -31.0821246039022,
+          "maximum_delta_degrees": 45.2219652389968,
+          "maximum_up_lines_per_second": 7.972514668474627,
+          "maximum_down_lines_per_second": 12.0
+        },
+        {
+          "neutral_degrees": 80.24061681867579,
+          "down_span_degrees": 11.779473148200168,
+          "down_sign": -1.0,
+          "valid_live_frames": 345,
+          "minimum_delta_degrees": -25.184599906614665,
+          "maximum_delta_degrees": 66.0114658374284,
+          "maximum_up_lines_per_second": 12.0,
+          "maximum_down_lines_per_second": 12.0
+        }
+      ]
+    },
+    {
+      "filename": "tilt-20261020T200823Z-18b8701c.zip",
+      "sha256": "4f4940e52b58cb8e1c7053bc2c070163154c06ac9971db1ec89f2aa8f37197a8",
+      "frames": 3903,
+      "valid_shape_frames": 2774,
+      "reasons": {
+        "No hand": 678,
+        "Tuck thumb and curl ring/little fingers": 364,
+        "Two-finger shape valid": 2774,
+        "Keep index and middle fingers extended": 83,
+        "Point both fingers in the same direction": 4
+      },
+      "fist_labelled_invalid_frames": 74,
+      "calibrations": [
+        {
+          "neutral_degrees": 52.78072357039514,
+          "down_span_degrees": 36.01252388375275,
+          "down_sign": 1.0,
+          "valid_live_frames": 546,
+          "minimum_delta_degrees": -18.767481748009743,
+          "maximum_delta_degrees": 37.89614156992201,
+          "maximum_up_lines_per_second": 5.327195606374662,
+          "maximum_down_lines_per_second": 12.0
+        },
+        {
+          "neutral_degrees": 33.255600455478515,
+          "down_span_degrees": 18.97795741937898,
+          "down_sign": 1.0,
+          "valid_live_frames": 396,
+          "minimum_delta_degrees": -23.928572625199763,
+          "maximum_delta_degrees": 35.73426915448678,
+          "maximum_up_lines_per_second": 12.0,
+          "maximum_down_lines_per_second": 12.0
+        }
+      ]
+    }
+  ],
+  "note": "Aggregate observations; intended scroll direction and intentional gesture releases were not labelled."
+}
