@@ -161,6 +161,50 @@ Run `python -m magicpointer run --help` for details.
 
 ## Limits and development
 
+### Try finger-tilt scrolling
+
+```sh
+python -m magicpointer tilt --camera 0 --fps 30
+```
+
+This one-camera experiment moves a **simulated document** beside the camera feed.
+It sends no OS pointer, click or scroll events. The regular `run` scrolling
+behavior is unchanged.
+
+1. Support your arm comfortably. Extend index and middle, keep them reasonably
+   straight, and curl ring/little fingers with the thumb tucked.
+2. Hold your fingers in a comfortable neutral position for half a second, then
+   press **Space** to capture neutral.
+3. Keeping the palm steady, tilt the two fingers **at their base knuckles** in
+   your desired downscroll direction. Hold steady, then press **D**. Aim for
+   about 15–30 degrees of comfortable tilt; at least 10 degrees is required with
+   the default dead zone. This establishes direction and full-speed range for
+   either hand. Whole-wrist rotation alone is intentionally ignored.
+4. Return to neutral to stop. Tilt down to scroll continuously down; tilt the
+   opposite way for upscroll. Tilt farther for greater speed. The yellow cross
+   stays fixed over the simulated document.
+5. Try holding neutral, down and up; then translate or rotate the whole hand while
+   keeping the fingers fixed relative to the palm. Note unwanted drift, jitter,
+   pose loss or an uncomfortable range. **R** resets calibration.
+
+**Q/Escape**, closing the window, or Ctrl+C saves and exits. Normal classifier
+results are displayed beside the experimental shape check, which allows base
+knuckle tilt while still requiring extended finger chains. Invalid/one-finger/
+open-palm poses stop simulated scrolling immediately. Loss of a valid shape for
+over 0.30 seconds, a processing stall or a handedness change clears calibration;
+capture neutral and down again when prompted.
+
+The default neutral dead zone is 5 degrees (`--dead-zone 7` increases it). Speed
+is capped at 12 simulated lines per second with 0.10-second smoothing. Calibration
+captures require a steady 0.30-second window with no more than 6 degrees of range.
+This is a feasibility experiment, not evidence of tracking accuracy at 12 feet.
+
+The terminal prints a `diagnostics/tilt-...zip` containing palm-relative angles,
+landmarks, normal pose classification, simulated speed, calibration key events
+and summary counts. No images, video or audio are stored or uploaded. Share this
+zip with your observations so tilt reliability can be evaluated before changing
+the actual scroll controller.
+
 ### Record gesture diagnostics
 
 If real poses become unrecognized when you rotate your hand, use the guided

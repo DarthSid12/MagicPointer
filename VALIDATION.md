@@ -115,3 +115,20 @@ B2 remains open for live confirmation and remaining pointing uncertainty.
 passed on commit `c59a8cf` for Windows and macOS with Python 3.11: package install,
 dependency checks, regression suite, CLI help, model download and blank-frame
 inference. These hosted checks do not establish live recognition accuracy.
+
+## Feature 10: palm-relative finger-tilt experiment
+
+Local regression suite: 52 tests, 51 passed, one Windows-only ABI check skipped.
+New checks cover geometric invariance under whole-hand translation/rotation/scale,
+calibration in both direction conventions, neutral dead zone, signed capped
+speed, invalid/missing/one-finger/palm poses, tracking loss, processing stalls,
+handedness changes, rejected calibration windows, monotonic timestamps and invalid
+configuration. A synthetic UI session verified no desktop construction, archive
+contents, resource cleanup and partial-session preservation after camera failure.
+The 1200-by-720 simulated page and camera preview were rendered and visually
+inspected for legibility and clipping; CLI help and whitespace checks passed.
+
+No physical camera capture or OS pointer/scroll events were used. Calibration,
+comfort, model angle jitter and usability need the user's live experiment. The
+real scroll controller and pointer mapping were not modified. Tilt logs contain
+landmarks, angles and calibration events locally under ignored diagnostics/.
