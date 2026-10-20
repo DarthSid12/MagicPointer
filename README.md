@@ -1,7 +1,7 @@
-# MagicPointer — feature 3 checkpoint
+# MagicPointer — feature 4 checkpoint
 
-Windows-first pointer prototype. This checkpoint implements features 1–3.
-Commands available: download-model, targets, cameras, calibrate, run --debug. Later gesture behaviors are not implemented yet.
+Windows-first pointer prototype. This checkpoint implements features 1–4.
+Commands available: download-model, targets, cameras, calibrate, run --debug, run (stereo desktop activation). Later gesture behaviors are not implemented yet.
 Hardware validation, native Windows input validation and the 12-foot target remain
 pending. See FEATURES.md, DEVELOPMENT.md and VALIDATION.md.
 
@@ -25,3 +25,5 @@ spacing. Print at 100%. Capture at least 15 varied checkerboard views with Space
 press C to solve, then show wall markers 0 and 1 to both cameras and Space to save.
 
 For a one-camera preview without OS input: `python -m magicpointer run --debug --left 0 --fps 30`. Q/Escape closes it.
+
+For stereo activation: `python -m magicpointer run --left 0 --right 1 --fps 30`. Verify wall markers, then hold a fist anywhere in view for 0.45 s. Q/Escape exits. Tracking loss stops control.

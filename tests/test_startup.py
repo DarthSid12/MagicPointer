@@ -5,11 +5,12 @@ import platform
 import tempfile
 import unittest
 from unittest.mock import patch
+
 from magicpointer.cli import main, parser
 from magicpointer.cameras import Cameras
 
-class StartupTests(unittest.TestCase):
 
+class StartupTests(unittest.TestCase):
     def test_help_without_hardware(self):
         with redirect_stdout(io.StringIO()) as output:
             self.assertEqual(main([]), 0)
@@ -39,9 +40,9 @@ class StartupTests(unittest.TestCase):
     def test_second_camera_failure_releases_both(self):
         from unittest.mock import MagicMock
         import numpy as np
-        (one, two) = (MagicMock(), MagicMock())
+        one, two = MagicMock(), MagicMock()
         one.isOpened.return_value = True
-        one.get.return_value = 30.0
+        one.get.return_value = 30.
         one.read.return_value = (True, np.zeros((1080, 1920, 3), dtype=np.uint8))
         two.isOpened.return_value = False
         with patch('cv2.VideoCapture', side_effect=[one, two]):
@@ -53,8 +54,17 @@ class StartupTests(unittest.TestCase):
     def test_targets_preserve_physical_dimensions(self):
         with tempfile.TemporaryDirectory() as directory, redirect_stdout(io.StringIO()):
             self.assertEqual(main(['targets', '--output', directory]), 0)
-            self.assertIn('width="300.0mm"', (Path(directory) / 'checkerboard.svg').read_text())
-            self.assertTrue((Path(directory) / 'marker-0.svg').is_file())
-            self.assertTrue((Path(directory) / 'marker-1.svg').is_file())
+            self.assertIn('width="300.0mm"', (Path(directory)/'checkerboard.svg').read_text())
+            self.assertTrue((Path(directory)/'marker-0.svg').is_file())
+            self.assertTrue((Path(directory)/'marker-1.svg').is_file())
+
+    @unittest.skipUnless(platform.system() == 'Windows', 'Native Windows ABI check')
+    def test_windows_sendinput_structure_abi_without_sending_events(self):
+        import ctypes
+        from magicpointer.desktop import Desktop
+        desktop = Desktop()
+        self.assertEqual(ctypes.sizeof(desktop.Input), 40 if ctypes.sizeof(ctypes.c_void_p) == 8 else 28)
+
+
 if __name__ == '__main__':
     unittest.main()
