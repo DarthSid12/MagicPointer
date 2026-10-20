@@ -132,3 +132,8 @@ No physical camera capture or OS pointer/scroll events were used. Calibration,
 comfort, model angle jitter and usability need the user's live experiment. The
 real scroll controller and pointer mapping were not modified. Tilt logs contain
 landmarks, angles and calibration events locally under ignored diagnostics/.
+
+[Feature 10 CI run 39488485036](https://github.com/Himir-Desai/MagicPointer/actions/runs/39488485036)
+passed on `2da63b7` for Windows and macOS with Python 3.11, including installation,
+dependency checks, tests, CLI startup and model inference. Physical-camera tilt
+comfort and reliability remain to be tested by the user.
