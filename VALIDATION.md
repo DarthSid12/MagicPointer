@@ -194,3 +194,34 @@ reports/B5-live-confirmation.md and reports/B5-confirmation-replay.json.
 This validates the reported fix for one user/session, not general gesture
 accuracy or stereo/12-foot/OS-scroll behavior. Runtime code and thresholds were
 unchanged; no new unit or UI tests were run for this documentation-only review.
+
+## Feature 7: integrated wrist scrolling; B6 thumb investigation
+
+`run` now replaces translation scrolling with automatic-neutral wrist-rate
+scrolling, using the experiment's shared 10-degree dead zone, 30-degree full-speed
+angle and bounded 12-step/sec response. Stereo uses triangulated index/middle
+direction after both model shapes pass; mono debug uses estimated pitch. Scroll
+mode freezes the pointer, ignores thumb labels and suppresses clicks. Index-only
+or fist exits; pointer mapping rebases on resume. Valid straight-pair pitch takes
+priority over fist-like labels during tilt. Palm stop, timing/depth/hand-identity
+checks, tracking-loss deactivation and normal clicks outside scroll remain.
+
+Final local checks: 74 tests run, 73 passed, one Windows-only ABI check skipped.
+Coverage includes automatic neutral, dead zone/rate cap, up/down wheel sign,
+30/60-Hz accumulation, thumb-label changes, invalid-pitch pause/recalibration,
+mode exit without pointer jump, click rearming, palm/tracking-loss stop, stereo
+pitch from reconstructed geometry, invalid depth/hand mismatch, and the main
+preview/render/dispatch loop without desktop input. Dependency check, CLI startup
+and diff whitespace checks passed. Main scroll preview was rendered and visually
+inspected. The real model blank-frame smoke initially could not create a graphics
+context inside the sandbox; rerunning outside it passed without opening a camera.
+
+Latest user archive through the main engine after seeded activation/scroll entry:
+1,048 frames, 90 up wheel steps, 101 down, zero click events and zero pointer
+moves; one later tracking-loss deactivation. This is a replay of unlabelled model
+landmarks, not intended-direction accuracy. Experiment Space/reset events are not
+main-app controls and are ignored after seeding. It does not validate actual mode
+entry, stereo camera noise or OS/application scroll distance. Synthetic tests
+cover entry and exit; physical stereo and live automatic-neutral checks remain.
+See reports/7-scroll-replay.json and reports/B6-thumb-estimates.md. B6 remains open;
+no ordinary click-classifier threshold has been changed.

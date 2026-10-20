@@ -116,7 +116,7 @@ def run(args):
             log = Log(args.output, metadata)
             if wrist:
                 print('Wrist experiment: SPACE neutral, R reset, Q save/exit. No OS input.')
-                print('Point index + middle toward screen, curl ring/little, relax thumb; tilt at the wrist.')
+                print('Point index + middle toward screen, curl ring/little; thumb estimates ignored. Tilt at the wrist.')
             else:
                 print('Tilt experiment: SPACE neutral, D down range, R reset, Q save/exit. No OS input.')
                 print('Keep your palm steady and tilt the extended fingers at their base knuckles.')

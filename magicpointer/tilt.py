@@ -5,6 +5,7 @@ import math
 import numpy as np
 
 from .tracking import gesture_metrics
+from .scrolling import tilt_speed
 
 
 def wrapped(angle):
@@ -71,7 +72,19 @@ def measure_wrist(hand):
     if valid_pitch is None:
         return None, reason
     points = np.asarray(hand.world, dtype=float)
-    axes = [points[base+3]-points[base] for base in (5, 9)]
+    return direction_pitch(points[[5, 8, 9, 12]])
+
+
+def direction_pitch(points):
+    """Pitch from index/middle MCP and tip pairs, in primary camera axes."""
+    points = np.asarray(points, dtype=float)
+    if points.shape != (4, 3) or not np.isfinite(points).all():
+        return None, 'Invalid finger geometry'
+    axes = [points[1]-points[0], points[3]-points[2]]
+    if any(np.linalg.norm(axis) < 1e-6 for axis in axes):
+        return None, 'Finger geometry unavailable'
+    if np.dot(*(axis/np.linalg.norm(axis) for axis in axes)) < .75:
+        return None, 'Point both fingers in the same direction'
     axis = sum(vector/np.linalg.norm(vector) for vector in axes)
     axis /= np.linalg.norm(axis)
     if -axis[2] < .25:
@@ -122,8 +135,7 @@ class Tilt:
             delta = wrapped(self.filtered-self.neutral)
             if self.direction is not None:
                 delta *= self.direction
-                magnitude = max(0., abs(delta)-self.dead_zone)
-                speed = math.copysign(min(1., magnitude/(self.span-self.dead_zone))*12., delta)
+                speed = tilt_speed(delta, self.dead_zone, self.span)
         return self._result(True, reason, delta, speed)
 
     def _result(self, valid, reason, delta, speed):

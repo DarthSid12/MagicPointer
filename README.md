@@ -132,14 +132,37 @@ reactivation.
 | Closed fist anywhere in the shared view, held 0.45 s | Activation chime; fist wrist becomes origin; cursor centers on primary display |
 | Index extended, other fingers curled | Index tip controls pointer relative to origin |
 | Index + thumb | One left click after 0.18 s of stable recognition |
-| Index + middle | Vertical two-finger movement scrolls after stabilization |
-| Index + thumb + middle | One right click after 0.18 s of stable recognition |
+| Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |
+| Index + thumb + middle outside scrolling | One right click after 0.18 s of stable recognition |
 | Entire palm open | Stop input immediately; confirm deactivation after 0.18 s with a different chime |
 
 Open the fingers for a click chord together: holding thumb-only long enough is a
 left click, even if you later add the middle finger. After a click, return to
 index-only or a fist for 0.18 s before another click or scroll. Holding a click
 pose does not repeat clicks. Unrecognized poses produce no pointer actions.
+
+While scrolling, the pointer stays over its current target and thumb estimates
+are ignored. Hold the two fingers toward the screen steadily for about half a
+second on entry: this captures your comfortable neutral. Tilt your whole hand up
+or down to scroll continuously; **±10 degrees** around neutral stops scrolling.
+Speed increases up to 12 wheel steps/sec at 30 degrees from neutral and stays
+capped beyond it. Actual distance per wheel step depends on the OS/application.
+Moving your hand vertically without tilting does not scroll.
+
+Return to index-only for 0.18 s to resume pointing. The pointer resumes at its
+frozen location without jumping; subsequent finger motion moves it from there.
+Exit scrolling before making a click. A fist also exits scrolling; a full palm
+still deactivates control. An invalid two-finger pose pauses scrolling immediately;
+after 0.30 s without valid pitch, hold steady to capture a new neutral. Tracking
+loss still deactivates control. A tilted straight pair takes priority over a
+fist-like classifier label while scrolling, provided its pitch remains valid.
+
+Stereo control uses triangulated finger direction in the primary camera's axes.
+The one-camera debug mode previews the same interaction using model-estimated
+pitch. Keep the cameras approximately level near the screen. Right-click entry
+still requires the normal thumb chord; once scrolling has started, that chord
+cannot click until you exit. Model thumb-estimation discrepancies during tilt
+are tracked in B6; ignoring them during scrolling does not correct the classifier.
 
 The interaction plane is parallel to the camera image plane, centered at the
 activation fist. Both whole-hand motion and index-tip motion affect it. A default
@@ -170,7 +193,7 @@ python -m magicpointer wrist-tilt --camera 0 --fps 30
 Keep index and middle fingers straight and curl ring/little fingers. Let the
 thumb rest comfortably; its position is ignored in this isolated wrist experiment
 because it has no click actions. The normal classifier readout may say `right click`
-when your thumb opens; this does not trigger a click or cancel wrist scrolling. With the camera approximately level near the screen, point the two
+regardless of its estimated thumb state; this does not trigger a click or cancel wrist scrolling. With the camera approximately level near the screen, point the two
 fingers toward the screen/camera in a comfortable neutral direction. Hold steady
 for half a second and press **Space**. This starts the simulated scroll controller
 immediately; no D calibration is needed.
@@ -197,7 +220,7 @@ testing. The camera-frame depth convention is described in the
 It sends no OS input and saves no images/audio/video. Share the printed
 `diagnostics/wrist-tilt-...zip` with observations; it records landmarks, estimated
 angle, calibration and simulated speed. The original `tilt` experiment and real
-`run` scrolling remain available with their previous behavior.
+`run` uses the integrated wrist-scrolling behavior described above.
 
 ### Try finger-tilt scrolling
 
@@ -206,8 +229,7 @@ python -m magicpointer tilt --camera 0 --fps 30
 ```
 
 This one-camera experiment moves a **simulated document** beside the camera feed.
-It sends no OS pointer, click or scroll events. The regular `run` scrolling
-behavior is unchanged.
+It sends no OS pointer, click or scroll events. Use regular `run` for the integrated wrist-scrolling behavior described above.
 
 1. Support your arm comfortably. Extend index and middle, keep them reasonably
    straight, and curl ring/little fingers with the thumb tucked.

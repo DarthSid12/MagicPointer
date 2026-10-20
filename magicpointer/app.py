@@ -7,7 +7,8 @@ from .audio import Chimes
 from .cameras import Cameras
 from .engine import Engine, Gesture, Observation
 from .stereo import Stereo
-from .tracking import Tracker, distance
+from .tracking import Tracker, distance, gesture_metrics
+from .tilt import measure_wrist, direction_pitch
 
 COLORS = {"inactive": (150, 150, 150), "active": (70, 210, 70),
           "click": (220, 120, 240), "scroll": (240, 180, 30), "unavailable": (0, 160, 255)}
@@ -26,6 +27,46 @@ def draw_hand(image, hand, color):
             cv2.line(image, tuple(points[index]), tuple(points[index+1]), color, 2)
     for point in points:
         cv2.circle(image, tuple(point), 4, color, -1)
+
+
+def index_only(hand):
+    metrics = gesture_metrics(hand.world)
+    return metrics['valid'] and [metrics['fingers'][name]['state'] for name in
+                                 ('index', 'middle', 'ring', 'little')] == [1, 0, 0, 0]
+
+
+def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1.):
+    """Keep stereo association/depth checks; ignore thumb only in latched mode."""
+    if left is None:
+        return None, "No reliable hand"
+    pitch, _ = measure_wrist(left)
+    point = index_only(left)
+    gesture = left.gesture
+    if stereo is None:
+        points = left.pixels / mono_scale
+        return Observation(gesture, (*points[0], 0.), (*points[8], 0.), pitch, point), "Tracking"
+    if right is None or left.label != right.label or (not scrolling and left.gesture != right.gesture):
+        return None, "Hands/gestures disagree between cameras"
+    right_pitch, _ = measure_wrist(right)
+    point = point and index_only(right)
+    # Thumb landmarks are neither a scrolling signal nor needed for metric
+    # position. Poor thumb estimates must not invalidate the entire stereo pair.
+    indices = [0] + list(range(5, 21)) if scrolling or gesture == Gesture.SCROLL else list(range(21))
+    points = stereo.reconstruct(left.pixels[indices], right.pixels[indices])
+    if points is None or np.linalg.norm(points[0]) > 3.6576:
+        return None, "Depth unreliable or beyond 12-foot target range"
+    indexed = dict(zip(indices, points))
+    if pitch is not None and right_pitch is not None:
+        pitch, _ = direction_pitch([indexed[i] for i in (5, 8, 9, 12)])
+    else:
+        pitch = None
+    if scrolling:
+        if Gesture.PALM in (left.gesture, right.gesture):
+            gesture = Gesture.PALM
+        elif ((gesture == Gesture.POINT and not point) or
+              (gesture == Gesture.FIST and right.gesture != Gesture.FIST)):
+            gesture = Gesture.UNKNOWN
+    return Observation(gesture, tuple(indexed[0]), tuple(indexed[8]), pitch, point), "Tracking"
 
 
 def run(args):
@@ -56,6 +97,7 @@ def run(args):
             print("Camera negotiated settings:", cameras.info)
             print("DEBUG: preview only; no OS pointer input" if args.debug else "STEREO CONTROL: Q/Escape or close window to stop")
             print("Hold fist 0.45 s to activate; hold gestures 0.18 s. Return to index-only between clicks.")
+            print("Two fingers toward screen: hold steady to set scroll neutral; tilt up/down. Index-only exits scrolling.")
             start, count, measured_fps = time.monotonic(), 0, 0.
             last_action, action_until = "", 0.
             while True:
@@ -79,21 +121,11 @@ def run(args):
                 elif not paired:
                     reason = "Camera pair timing mismatch"
                 elif left is not None:
-                    if stereo:
-                        right = hands[1]
-                        if right is not None and left.label == right.label and left.gesture == right.gesture:
-                            points = stereo.reconstruct(left.pixels, right.pixels)
-                            if points is not None and np.linalg.norm(points[0]) <= 3.6576:
-                                observation = Observation(left.gesture, tuple(points[0]), tuple(points[8]))
-                            else:
-                                reason = "Depth unreliable or beyond 12-foot target range"
-                        else:
-                            reason = "Hands/gestures disagree between cameras"
-                    else:
-                        if not engine.active:
-                            mono_scale = max(10., float(np.linalg.norm(left.pixels[0]-left.pixels[9])))
-                        points = left.pixels / mono_scale
-                        observation = Observation(left.gesture, (*points[0], 0.), (*points[8], 0.))
+                    if stereo is None and not engine.active:
+                        mono_scale = max(10., float(np.linalg.norm(left.pixels[0]-left.pixels[9])))
+                    observation, reason = observe(left, hands[1] if stereo else None,
+                                                  stereo=stereo, scrolling=engine.scrolling,
+                                                  mono_scale=mono_scale)
                     if engine.active and left.label != current_label:
                         observation, reason = None, "Controlling hand changed"
                 # Reject implausible same-label hand switches in metric stereo mode.
@@ -124,7 +156,7 @@ def run(args):
                 state = "inactive" if not engine.active else "active"
                 if observation is None:
                     state = "unavailable"
-                elif engine.active and left.gesture == Gesture.SCROLL:
+                elif engine.scrolling:
                     state = "scroll"
                 elif now < action_until:
                     state = "click"
@@ -137,9 +169,17 @@ def run(args):
                     panel = np.full((540, 960, 3), (25, 25, 25), dtype=np.uint8)
                 # Primary-camera raw view is intentionally labelled: controls mirror X by default.
                 lines = ["DEBUG / NO DESKTOP INPUT" if args.debug else "STEREO / DESKTOP CONTROL",
-                         f"State: {state} | Gesture: {left.gesture.value if left else 'none'}",
+                         f"State: {state} | Pose estimate: {left.gesture.value if left else 'none'}" +
+                         (" (clicks ignored)" if engine.scrolling else ""),
                          reason if observation is None else (last_action if now < action_until else "Tracking"),
                          f"Processing: {measured_fps:.1f} FPS | Q / Esc / close window to stop"]
+                if engine.scrolling:
+                    scroll = engine.scroll
+                    feedback = "Hold two fingers steady: setting scroll neutral"
+                    if scroll.neutral is not None:
+                        feedback = (f"Wrist scroll: {scroll.delta:+.1f} deg | {scroll.speed:+.1f}/s (down +)"
+                                    if scroll.delta is not None else "Scroll paused: restore two-finger pose")
+                    lines.append(feedback + " | Index-only exits")
                 for i, line in enumerate(lines):
                     cv2.putText(panel, line, (15, 27+i*26), cv2.FONT_HERSHEY_SIMPLEX, .58, (0, 0, 0), 4)
                     cv2.putText(panel, line, (15, 27+i*26), cv2.FONT_HERSHEY_SIMPLEX, .58, color, 1)

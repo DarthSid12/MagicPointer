@@ -1,0 +1,68 @@
+{
+  "thumb_estimates": [
+    {
+      "archive": "tilt-20261020T200538Z-01a0d29f.zip",
+      "sha256": "b783d1b7e696573728c137c252368e499cb3ee3e1c53d9378a3f4d2f3789abc4",
+      "detected_estimates": {
+        "tucked_estimate": 4199,
+        "open_estimate": 122,
+        "uncertain_estimate": 53
+      },
+      "recorded_live_estimates": {
+        "tucked_estimate": 1106
+      }
+    },
+    {
+      "archive": "tilt-20261020T200823Z-18b8701c.zip",
+      "sha256": "4f4940e52b58cb8e1c7053bc2c070163154c06ac9971db1ec89f2aa8f37197a8",
+      "detected_estimates": {
+        "open_estimate": 174,
+        "uncertain_estimate": 188,
+        "tucked_estimate": 2863
+      },
+      "recorded_live_estimates": {
+        "tucked_estimate": 942,
+        "uncertain_estimate": 13,
+        "open_estimate": 7
+      }
+    },
+    {
+      "archive": "wrist-tilt-20261020T202052Z-dc822480.zip",
+      "sha256": "a45f14bab1aab01d9eca09ebd1a52cb17b2d92bb4e6ad0d807fd37efd9a188a2",
+      "detected_estimates": {
+        "open_estimate": 577,
+        "uncertain_estimate": 103,
+        "tucked_estimate": 613
+      },
+      "recorded_live_estimates": {
+        "tucked_estimate": 233,
+        "open_estimate": 24,
+        "uncertain_estimate": 18
+      }
+    },
+    {
+      "archive": "wrist-tilt-20261020T203236Z-0dbdfdbb.zip",
+      "sha256": "63374d9e7f3d743bdfc2f6aa083701a33c65244b969add16f7eaa787e66ee592",
+      "detected_estimates": {
+        "open_estimate": 241,
+        "tucked_estimate": 839,
+        "uncertain_estimate": 23
+      },
+      "recorded_live_estimates": {
+        "tucked_estimate": 647,
+        "uncertain_estimate": 9,
+        "open_estimate": 159
+      }
+    }
+  ],
+  "note": "Landmark estimates cannot establish actual thumb posture. No video or intent labels. No OS input.",
+  "main_app_replay": {
+    "seeded_activation_and_scroll_entry": true,
+    "replayed_frames": 1048,
+    "up_wheel_steps": 90,
+    "down_wheel_steps": 101,
+    "click_events": 0,
+    "pointer_move_events": 0,
+    "deactivation_events": 1
+  }
+}

@@ -5,6 +5,8 @@ from enum import Enum
 import math
 from typing import Optional, Tuple
 
+from .scrolling import PitchScroll
+
 Point = Tuple[float, float, float]
 
 
@@ -23,6 +25,8 @@ class Observation:
     gesture: Gesture
     wrist: Point
     tip: Point
+    scroll_pitch: Optional[float] = None
+    point_shape: bool = False
 
 
 @dataclass(frozen=True)
@@ -54,7 +58,11 @@ class Engine:
         self._last_time = None
         self._last_seen = None
         self._action_latched = False
-        self._scroll_y = None
+        self.scrolling = False
+        self.scroll = PitchScroll()
+        self._exit_since = None
+        self._offset = (0., 0.)
+        self._rebase = False
         self._last_move = None
 
     def _stop(self, reason):
@@ -62,7 +70,11 @@ class Engine:
         self.origin = None
         self._candidate = None
         self._action_latched = False
-        self._scroll_y = None
+        self.scrolling = False
+        self.scroll = PitchScroll()
+        self._exit_since = None
+        self._offset = (0., 0.)
+        self._rebase = False
         self._last_move = None
         return [Event("deactivate", reason)]
 
@@ -80,13 +92,13 @@ class Engine:
             return events
         if not valid:
             self._candidate = None
-            self._scroll_y = None
+            self.scroll.update(None, now)
+            self._exit_since = None
             return []
         self._last_seen = now
         gesture = observation.gesture
         if gesture != self._candidate:
             self._candidate, self._since = gesture, now
-            self._scroll_y = None
         elapsed = now - self._since
         if not self.active:
             if gesture == Gesture.FIST and elapsed >= self.activation_dwell:
@@ -98,15 +110,43 @@ class Engine:
             return []
         # Stop motion immediately on a palm candidate, then confirm the transition.
         if gesture == Gesture.PALM:
+            self.scroll.update(None, now)
+            self._exit_since = None
             return self._stop("open palm") if elapsed >= self.dwell else []
+        if (not self.scrolling and gesture == Gesture.SCROLL and elapsed >= self.dwell
+                and not self._action_latched and observation.scroll_pitch is not None):
+            self.scrolling = True
+            self.scroll.reset()
+        if self.scrolling:
+            # Thumb is deliberately irrelevant once latched. Only a stable
+            # index-only shape/fist releases the mode; a palm stops globally.
+            exiting = (observation.scroll_pitch is None and
+                       (observation.point_shape or gesture in (Gesture.POINT, Gesture.FIST)))
+            if exiting:
+                self.scroll.update(None, now)
+                if self._exit_since is None:
+                    self._exit_since = now
+                if now-self._exit_since >= self.dwell:
+                    self.scrolling = False
+                    self.scroll.reset()
+                    self._rebase = True
+                    self._last_move = None
+                    self._action_latched = gesture not in (Gesture.POINT, Gesture.FIST)
+                return []
+            self._exit_since = None
+            lines = self.scroll.update(observation.scroll_pitch, now)
+            return [Event("scroll", lines)] if lines else []
         if gesture in (Gesture.FIST, Gesture.POINT) and elapsed >= self.dwell:
             self._action_latched = False
         events = []
         if gesture in (Gesture.POINT, Gesture.LEFT, Gesture.RIGHT):
             x = (observation.tip[0] - self.origin[0]) / self.width
             y = (observation.tip[1] - self.origin[1]) / self.height
-            target = (max(0., min(1., .5 + (-x if self.mirror_x else x))),
-                      max(0., min(1., .5 + y)))
+            raw = (.5 + (-x if self.mirror_x else x), .5 + y)
+            if self._rebase:
+                self._offset = tuple(a-b for a, b in zip(self.cursor, raw))
+                self._rebase = False
+            target = tuple(max(0., min(1., value+offset)) for value, offset in zip(raw, self._offset))
             # Time-based low-pass smoothing behaves similarly at 30 and 60 Hz.
             alpha = 1.0 if self._last_move is None else 1 - math.exp(-max(dt, 0) / .045)
             self.cursor = tuple(a + alpha * (b - a) for a, b in zip(self.cursor, target))
@@ -117,14 +157,4 @@ class Engine:
         if gesture in (Gesture.LEFT, Gesture.RIGHT) and not self._action_latched:
             self._action_latched = True
             events.append(Event("click", "left" if gesture == Gesture.LEFT else "right"))
-        elif gesture == Gesture.SCROLL and not self._action_latched:
-            # Entry emits nothing; all motion is relative to the entry location.
-            y = observation.tip[1]
-            if self._scroll_y is None:
-                self._scroll_y = y
-            else:
-                lines = int((self._scroll_y - y) / self.height * 30)
-                if lines:
-                    self._scroll_y -= lines * self.height / 30
-                    events.append(Event("scroll", max(-10, min(10, lines))))
         return events

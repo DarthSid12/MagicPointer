@@ -11,10 +11,10 @@ from magicpointer.engine import Gesture
 from magicpointer.tracking import Hand
 
 
-def debug_session():
+def debug_session(poses=None):
     """Exercise actual render/engine/dispatch loop, with synthetic camera input."""
     args = parser().parse_args(['run', '--debug', '--mute'])
-    poses = [Gesture.FIST]*12 + [Gesture.POINT]*5 + [Gesture.LEFT]*8 + [Gesture.POINT]*5 + [Gesture.PALM]*8
+    poses = poses or [Gesture.FIST]*12 + [Gesture.POINT]*5 + [Gesture.LEFT]*8 + [Gesture.POINT]*5 + [Gesture.PALM]*8
     pixels = np.array([(900.+(i%4)*25, 650.-(i//4)*30) for i in range(21)])
     camera = MagicMock()
     camera.__enter__.return_value = camera
@@ -34,7 +34,11 @@ def debug_session():
         return [Frame(frame, now[0])]
 
     def detect(*_):
-        return Hand(pixels.copy(), [], 'Right', poses[min(index[0], len(poses)-1)])
+        pose = poses[min(index[0], len(poses)-1)]
+        if isinstance(pose, Hand):
+            pose.pixels = pixels.copy()
+            return pose
+        return Hand(pixels.copy(), [], 'Right', pose)
 
     def key(_):
         index[0] += 1
