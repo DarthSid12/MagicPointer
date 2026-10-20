@@ -99,6 +99,16 @@ class Engine:
         if gesture in (Gesture.FIST, Gesture.POINT) and elapsed >= self.dwell:
             self._action_latched = False
         events = []
+        if gesture in (Gesture.POINT, Gesture.LEFT, Gesture.RIGHT):
+            x = (observation.tip[0] - self.origin[0]) / self.width
+            y = (observation.tip[1] - self.origin[1]) / self.height
+            target = (max(0., min(1., .5 + (-x if self.mirror_x else x))),
+                      max(0., min(1., .5 + y)))
+            # Time-based low-pass smoothing behaves similarly at 30 and 60 Hz.
+            alpha = 1.0 if self._last_move is None else 1 - math.exp(-max(dt, 0) / .045)
+            self.cursor = tuple(a + alpha * (b - a) for a, b in zip(self.cursor, target))
+            self._last_move = now
+            events.append(Event("move", self.cursor))
         if elapsed < self.dwell:
             return events
         return events

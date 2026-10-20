@@ -26,6 +26,15 @@ class EngineTests(unittest.TestCase):
         for gesture in (Gesture.POINT, Gesture.LEFT, Gesture.RIGHT, Gesture.SCROLL, Gesture.PALM):
             self.assertEqual(self.hold(gesture), [])
 
+    def test_fist_centers_once_and_uses_origin_anywhere(self):
+        events = self.hold(Gesture.FIST, wrist=(1.0, -0.4, 3.0))
+        self.assertEqual([e.kind for e in events], ['activate', 'move'])
+        self.assertEqual(events[-1].value, (0.5, 0.5))
+        self.assertEqual(self.hold(Gesture.FIST), [])
+        move = self.sample(Gesture.POINT, tip=(1.1, -0.4, 3.0))[-1]
+        self.assertAlmostEqual(move.value[0], 0.75)
+        self.assertAlmostEqual(move.value[1], 0.5)
+
     def test_activation_centers_once_at_fist_origin(self):
         events = self.hold(Gesture.FIST, wrist=(1.0, -0.4, 3.0))
         self.assertEqual([e.kind for e in events], ['activate', 'move'])
@@ -46,6 +55,12 @@ class EngineTests(unittest.TestCase):
         events = self.sample(Gesture.LEFT, dt=0.5)
         self.assertEqual([e.kind for e in events], ['deactivate'])
         self.assertFalse(self.engine.active)
+
+    def test_mapping_clamped_and_mirrored(self):
+        self.engine = Engine(mirror_x=True)
+        self.activate()
+        event = self.sample(Gesture.POINT, tip=(100.0, -100.0, 2.0))[-1]
+        self.assertEqual(event.value, (0.0, 0.0))
 
     def test_short_fist_and_interrupted_candidates_do_not_activate(self):
         self.hold(Gesture.FIST, 0.3)
