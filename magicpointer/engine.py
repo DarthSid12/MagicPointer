@@ -65,7 +65,7 @@ class Engine:
         self._rebase = False
         self._last_move = None
 
-    def _stop(self, reason):
+    def stop(self, reason):
         self.active = False
         self.origin = None
         self._candidate = None
@@ -87,7 +87,7 @@ class Engine:
             math.isfinite(v) for point in (observation.wrist, observation.tip) for v in point)
         # A long processing stall must not resume a previously armed click.
         if self.active and self._last_seen is not None and now - self._last_seen > self.loss_timeout:
-            events = self._stop("tracking lost")
+            events = self.stop("tracking lost")
             self._last_seen = now if valid else self._last_seen
             return events
         if not valid:
@@ -112,7 +112,7 @@ class Engine:
         if gesture == Gesture.PALM:
             self.scroll.update(None, now)
             self._exit_since = None
-            return self._stop("open palm") if elapsed >= self.dwell else []
+            return self.stop("open palm") if elapsed >= self.dwell else []
         if (not self.scrolling and gesture == Gesture.SCROLL and elapsed >= self.dwell
                 and not self._action_latched and observation.scroll_pitch is not None):
             self.scrolling = True

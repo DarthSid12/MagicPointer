@@ -78,7 +78,7 @@ class Hand:
 
 
 class Tracker:
-    def __init__(self, model):
+    def __init__(self, model, num_hands=1):
         import mediapipe as mp
         from .model import verify
         self.mp = mp
@@ -87,25 +87,31 @@ class Tracker:
                 base_options=mp.tasks.BaseOptions(model_asset_path=str(verify(model)),
                                                   delegate=mp.tasks.BaseOptions.Delegate.CPU),
                 running_mode=mp.tasks.vision.RunningMode.VIDEO,
-                num_hands=1, min_hand_detection_confidence=.65,
+                num_hands=num_hands, min_hand_detection_confidence=.65,
                 min_hand_presence_confidence=.65, min_tracking_confidence=.65))
         self.timestamp = -1
 
-    def detect(self, image, timestamp):
+    def detect_all(self, image, timestamp):
         import cv2
         import numpy as np
         self.timestamp = max(self.timestamp + 1, int(timestamp * 1000))
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         result = self.detector.detect_for_video(
             self.mp.Image(image_format=self.mp.ImageFormat.SRGB, data=rgb), self.timestamp)
-        if not result.hand_landmarks:
-            return None
         height, width = image.shape[:2]
-        pixels = np.array([(p.x * width, p.y * height) for p in result.hand_landmarks[0]])
-        world = [(p.x, p.y, p.z) for p in result.hand_world_landmarks[0]]
-        category = result.handedness[0][0]
-        normalized = [(p.x, p.y, p.z) for p in result.hand_landmarks[0]]
-        return Hand(pixels, world, category.category_name, classify(world), category.score, normalized)
+        hands = []
+        for landmarks, world_landmarks, categories in zip(result.hand_landmarks, result.hand_world_landmarks, result.handedness):
+            pixels = np.array([(p.x * width, p.y * height) for p in landmarks])
+            world = [(p.x, p.y, p.z) for p in world_landmarks]
+            category = categories[0]
+            normalized = [(p.x, p.y, p.z) for p in landmarks]
+            hands.append(Hand(pixels, world, category.category_name, classify(world), category.score, normalized))
+        return hands
+
+    def detect(self, image, timestamp):
+        """Compatibility for the single-hand diagnostic experiments."""
+        hands = self.detect_all(image, timestamp)
+        return hands[0] if hands else None
 
     def close(self):
         self.detector.close()
