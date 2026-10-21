@@ -316,3 +316,62 @@ passed on `06fc40c` for Windows and macOS with Python 3.11: dependency installat
 regression suite, CLI startup, model download and blank-frame inference. The live
 macOS preview test above additionally exercises real simultaneous capture;
 calibrated stereo hardware accuracy remains unverified.
+
+## 3.1 / 4 revamp / 12.1 / B8: readable shared gestures and one-hand ownership
+
+Main debug now displays a large shared gesture label and a separate fist-countdown,
+locked-hand or paused status banner. Main capture detects up to four hands per view
+(configurable 1-8); local spatial tracking preserves IDs independently of model
+list order. One continuous matched fist held for 2.5 seconds selects the owner and
+emits the activation chime. Input uses only that owner until its palm releases it.
+Tracking loss pauses/deactivates input but retains ownership; other hands do not
+get to activate or release an existing lock. Ambiguous crossings/pairs pause.
+
+Both camera views are normalized into a palm coordinate frame, their landmark
+geometry is averaged, and the gesture is classified once. Raw per-view gesture
+labels remain in the small diagnostics and recording; they are not independent
+input decisions. Both views must support an unambiguous match, with no one-view
+fallback (user-confirmed). Handedness, shape consistency and temporal continuity
+support association before calibration; calibrated mode also validates stereo
+anchors. These are heuristic tracking/association checks, not biometric identity
+or a trained multi-view gesture network. Similar same-handed hands can require
+separation before a match becomes unambiguous.
+
+Uncalibrated debug now permits shared-gesture activation and simulated pointer,
+click and wrist-scroll events without printouts. Position is primary-view image
+space normalized by activation palm size; this does not estimate metric depth.
+`--uncalibrated` explicitly forces testing even with an existing calibration file.
+The flag cannot enable real OS input. Normal desktop control retains calibrated
+stereo geometry and wall-marker checks. Session archives now include every detected
+hand, track IDs, candidate/owner IDs, selection progress and combined geometry.
+
+Validation checkpoints:
+
+- Tracking/fusion foundation staged tree: tested in an isolated snapshot of the
+  previous commit plus staged component changes, 96 tests run, 95 passed, one
+  Windows ABI skip. This confirms that rollback checkpoint still runs with the
+  original application/fixtures. No intermediate integration files were included.
+- Final integration: 100 tests run, 99 passed, one Windows ABI skip. Coverage adds
+  view rotation/scale/translation normalization, shared classification independent
+  of raw pose labels, required two-view evidence, model multi-hand extraction and
+  legacy single-hand compatibility, ID order changes, ambiguous crossings, unique
+  fist selection, palm release, selection after loss, and uncalibrated bypass guards.
+- An end-to-end two-camera scene switches the fist between hands before the dwell,
+  locks only after a continuous 2.5 seconds, ignores the other hand's palm, pauses
+  when the owner's second view disappears, resumes the same IDs, releases on the
+  owner's palm and then selects the other hand. No click originates from distractors.
+- Countdown and locked/shared-point panels were rendered from synthetic data and
+  visually inspected. The main banner is substantially larger than per-view text;
+  paused state and no-metric-depth labels remain separate. CLI help and whitespace
+  checks passed. CI model smoke now initializes the four-hand model configuration.
+- Live macOS capture/model/render/archive smoke: cameras 0 and 1, 1920x1080, about
+  30 negotiated FPS, two four-hand trackers, 24 displayed pairs, normal exit and
+  data-only archive. Desktop construction was explicitly prohibited. The archive
+  contains both-camera hand lists and selection diagnostics, but no hands were
+  detected during this short test. It does not establish live gesture accuracy,
+  owner recovery under occlusion, audible chime acceptance or long-run latency.
+
+The live local archive is `diagnostics/debug-20261021T233028Z-b47554b5.zip` and is
+not committed. B8 remains open for actual multi-hand confirmation. B6 thumb-estimate
+accuracy and B7 click/scroll entry timing were not independently changed by this
+work. Calibrated hardware/12-foot acceptance remains pending.

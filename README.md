@@ -1,7 +1,7 @@
 # MagicPointer
 
 Windows-first stereo hand pointer, with an optional macOS input adapter and a
-single-camera debug preview. The implementation is an initial prototype: real
+one-/two-camera debug preview. The implementation is an initial prototype: real
 Windows input, camera-rig accuracy, gesture recognition on real hands, and the
 12-foot target require hardware validation. See [VALIDATION.md](VALIDATION.md).
 
@@ -71,7 +71,8 @@ stereo debug runs are recorded; normal desktop-control runs are not recorded.
 The ZIP contains `session.json`, `samples.jsonl` and `summary.json`: camera settings,
 timestamps, both cameras' landmark/pose estimates when applicable, thumb/finger
 metrics, accepted observations or rejection reasons, pointer state, scroll neutral
-and angle, and simulated input events. These recordings currently contain no
+and angle, and simulated input events. Main debug sessions also include all detected
+hands, local track IDs, selected owner IDs and the combined gesture geometry. These recordings currently contain no
 camera images, video or audio. Data stays local; share the ZIP for diagnosis.
 The uncompressed session folder is retained, and samples are flushed each frame;
 a forced process kill may leave that folder without a finalized ZIP. The `tilt`
@@ -79,8 +80,19 @@ and `wrist-tilt` experiments continue saving their existing recordings; `collect
 continues recording the labelled intervals selected with Space.
 
 Mono preview estimates scale from palm size at activation. It cannot measure
-stereo depth or establish 12-foot accuracy. Only one hand is tracked per view.
-Keep other hands out of view while controlling the pointer.
+stereo depth or establish 12-foot accuracy. The main app detects up to four hands per view by default (`--max-hands 1` through
+`8` changes that limit). Hold **one fist for 2.5 seconds** to choose the controlling
+hand and hear the activation chime. After selection, only that hand can control
+the virtual/real pointer; other hands are ignored for input. Open the selected
+hand's full palm to release it. The large debug banner shows the shared gesture,
+fist countdown, hand lock or paused state so it can be read from farther away.
+
+Detection list order never identifies the owner. Spatial continuity preserves
+local hand IDs; ambiguous crossings or missing selected views pause input instead
+of selecting a different hand. Tracking loss retains ownership, although input
+deactivates after 0.30 seconds: return the same hand near its last tracked position
+and hold a fist again to resume. If tracking cannot be recovered, Q/Escape and
+restart lets you select afresh. This is visual tracking, not biometric identity.
 
 ## Try two cameras
 
@@ -95,12 +107,30 @@ mode sends no OS pointer, click or scroll input. Data-only recording automatical
 includes both cameras in the same diagnostic ZIP; no images/video/audio are saved.
 
 Before calibration, or if calibration cannot be loaded or does not match the
-selected indices/resolution, it starts in **PREVIEW ONLY**. Both views and model
-estimates remain available, but depth and joint pointer simulation are disabled.
-The console and archive explain why calibration was unavailable. After completing
-calibration, restart the same command: **CALIBRATED STEREO** checks wall markers
+selected indices/resolution, it starts in **UNCALIBRATED TEST**. Both views now
+contribute to one shared gesture decision and hand selection, and approximate
+virtual pointing/clicking/scrolling can be tested without printouts. Pointer
+position uses the primary view normalized by palm size; it has no metric depth.
+The console and archive explain why calibration was unavailable. To force this
+mode even when a calibration file exists, use:
+
+```sh
+python -m magicpointer run --debug --uncalibrated --left 0 --right 1 --fps 30
+```
+
+`--uncalibrated` is allowed only with `--debug`. After completing
+calibration, restart without `--uncalibrated`: **CALIBRATED STEREO** checks wall markers
 before enabling the usual fist/point/click/scroll virtual-pointer simulation.
-Pair timing, hand agreement, depth validity and tracking-loss checks still apply.
+Pair timing, hand association, depth validity and tracking-loss checks still apply.
+
+Each camera extracts landmarks for all detected hands. A matched pair is normalized
+into a common palm frame; its geometry is averaged and classified once. Independent
+per-view gesture labels are only diagnostic. Both views must support a confident
+match; there is no one-camera fallback during a two-camera session. Similar
+same-handed hands may be ambiguous without calibration: keep only one fist raised
+and separate overlapping hands. Calibrated mode additionally uses stereo geometry
+to validate pairing and supply metric position. The shared gesture estimator is
+landmark fusion, not an end-to-end trained multi-view neural network.
 
 Use `python -m magicpointer cameras --limit 4 --fps 30` to probe camera indices,
 then select the pair you want with `--left` and `--right`. Index numbers may
@@ -157,8 +187,8 @@ python -m magicpointer run --left 0 --right 1 --fps 30
 ```
 
 With a matching `calibration.json`, debug verifies the wall markers before
-allowing simulated activation. Without usable calibration, debug shows only the
-two-camera preview described above. Real desktop control always requires valid
+allowing simulated activation. Without usable calibration, debug uses the
+uncalibrated testing mode described above. Real desktop control always requires valid
 calibration and marker verification. Marker verification replaces repeating the full checkerboard process
 when the rig stays fixed. During use, visible markers are checked periodically;
 a detected displacement stops the app and requires recalibration. Hidden markers
@@ -174,7 +204,7 @@ reactivation.
 
 | Gesture | Result |
 | --- | --- |
-| Closed fist anywhere in the shared view, held 0.45 s | Activation chime; fist wrist becomes origin; cursor centers on primary display |
+| One closed fist in the shared view, held 2.5 s | Select and lock that hand; activation chime; fist wrist becomes origin; cursor centers on primary display |
 | Index extended, other fingers curled | Index tip moves pointer within the local workspace |
 | Index + thumb | One left click after 0.18 s of stable recognition |
 | Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |

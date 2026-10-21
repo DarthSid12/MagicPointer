@@ -10,12 +10,13 @@ from magicpointer.cameras import Frame
 from magicpointer.cli import parser
 from magicpointer.engine import Gesture
 from magicpointer.tracking import Hand
+from test_tracking import hand
 
 
 def debug_session(poses=None, output=None, resources=None):
     """Exercise actual render/engine/dispatch loop, with synthetic camera input."""
     args = parser().parse_args(['run', '--debug', '--mute'])
-    poses = poses or [Gesture.FIST]*12 + [Gesture.POINT]*5 + [Gesture.LEFT]*8 + [Gesture.POINT]*5 + [Gesture.PALM]*8
+    poses = poses or [Gesture.FIST]*55 + [Gesture.POINT]*5 + [Gesture.LEFT]*8 + [Gesture.POINT]*5 + [Gesture.PALM]*8
     pixels = np.array([(900.+(i%4)*25, 650.-(i//4)*30) for i in range(21)])
     camera = MagicMock()
     camera.__enter__.return_value = camera
@@ -41,7 +42,12 @@ def debug_session(poses=None, output=None, resources=None):
         if isinstance(pose, Hand):
             pose.pixels = pixels.copy()
             return pose
-        return Hand(pixels.copy(), [], 'Right', pose)
+        thumb, fingers = {
+            Gesture.FIST: (False, [0, 0, 0, 0]), Gesture.POINT: (False, [1, 0, 0, 0]),
+            Gesture.LEFT: (True, [1, 0, 0, 0]), Gesture.RIGHT: (True, [1, 1, 0, 0]),
+            Gesture.SCROLL: (False, [1, 1, 0, 0]), Gesture.PALM: (True, [1, 1, 1, 1]),
+        }[pose]
+        return Hand(pixels.copy(), hand(thumb, fingers), 'Right', pose)
 
     def key(_):
         index[0] += 1
@@ -50,7 +56,7 @@ def debug_session(poses=None, output=None, resources=None):
     if resources is not None:
         resources.update(tracker=tracker, camera=camera, audio=audio)
     camera.read.side_effect = read
-    tracker.detect.side_effect = detect
+    tracker.detect_all.side_effect = lambda *_: ([result] if (result := detect()) is not None else [])
     with tempfile.TemporaryDirectory() as directory, \
             patch.object(app, 'Cameras', return_value=camera), patch.object(app, 'Tracker', return_value=tracker), \
             patch.object(app, 'Chimes', return_value=audio), patch.object(app.time, 'monotonic', side_effect=tick), \
@@ -67,7 +73,7 @@ class AppTests(unittest.TestCase):
     def test_debug_session_renders_states_and_never_constructs_desktop(self):
         result, displays, tracker, camera, audio = debug_session()
         self.assertEqual(result, 0)
-        self.assertEqual(displays[0].shape, (540, 960, 3))
+        self.assertEqual(displays[0].shape, (900, 1280, 3))
         self.assertGreater(len(displays), 30)
         self.assertIn(((True,), {}), [(c.args, c.kwargs) for c in audio.play.call_args_list])
         self.assertIn(((False,), {}), [(c.args, c.kwargs) for c in audio.play.call_args_list])

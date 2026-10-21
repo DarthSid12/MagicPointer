@@ -56,7 +56,7 @@ class DebugLog:
     def _write(self, name, value):
         (self.path/name).write_text(json.dumps(json_value(value), allow_nan=False, indent=2), encoding='utf-8')
 
-    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state):
+    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state, detections=None, ownership=None, selection=None):
         sample = {'elapsed_seconds': now-self.started, 'monotonic_seconds': now,
                   'cameras': [{'grabbed_at': frame.grabbed_at,
                                'image_size': [frame.image.shape[1], frame.image.shape[0]],
@@ -71,6 +71,18 @@ class DebugLog:
                              'delta_degrees': engine.scroll.delta,
                              'down_steps_per_second': engine.scroll.speed},
                   'events': [asdict(event) for event in events]}
+        if detections is not None:
+            for index, hands in enumerate(detections):
+                visible = ownership.visible[index] if ownership else {}
+                sample['cameras'][index]['hands'] = [
+                    {'track_id': next((key for key, tracked in visible.items() if tracked is hand), None),
+                     **hand_sample(hand)} for hand in hands]
+        if selection is not None:
+            sample['selection'] = {'owner_ids': ownership.owner, 'candidate_ids': ownership.candidate,
+                                   'visible_ids': [list(view) for view in ownership.visible],
+                                   'progress': selection.progress, 'reason': selection.reason,
+                                   'shape_disagreement': selection.spread,
+                                   'combined_hand': hand_sample(selection.combined)}
         self.stream.write(json.dumps(json_value(sample), allow_nan=False)+'\n')
         self.stream.flush()
         self.counts['frames'] += 1

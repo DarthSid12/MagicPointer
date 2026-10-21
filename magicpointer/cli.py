@@ -21,6 +21,13 @@ def camera(value):
     return number
 
 
+def hand_limit(value):
+    number = int(value)
+    if not 1 <= number <= 8:
+        raise argparse.ArgumentTypeError("hands per camera must be between 1 and 8")
+    return number
+
+
 def parser():
     root = argparse.ArgumentParser(description="MagicPointer: Windows-first stereo hand pointer")
     root.add_argument("--version", action="version", version=__version__)
@@ -33,12 +40,14 @@ def parser():
         cmd.add_argument("--calibration", type=Path, default=Path("calibration.json"))
         if name == "run":
             cmd.add_argument("--debug", action="store_true", help="one-/two-camera debug with automatic data recording; stereo preview works before calibration; no OS input")
+            cmd.add_argument("--uncalibrated", action="store_true", help="force approximate image-space testing without calibration; requires --debug")
             cmd.add_argument("--output", type=Path, default=Path("diagnostics"), help="debug-session recording directory (default: diagnostics)")
             cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))
             cmd.add_argument("--workspace-width", type=positive, default=.40, help="local interaction plane width, metres (default: 0.40)")
             cmd.add_argument("--workspace-height", type=positive, default=.25, help="local interaction plane height, metres (default: 0.25)")
             cmd.add_argument("--mirror-x", action=argparse.BooleanOptionalAction, default=True)
             cmd.add_argument("--mute", action="store_true")
+            cmd.add_argument("--max-hands", type=hand_limit, default=4, help="maximum hands detected per camera (1-8, default: 4)")
         else:
             cmd.add_argument("--square-mm", type=positive, default=25., help="measured checkerboard square edge in mm")
             cmd.add_argument("--marker-size", type=positive, required=True, help="measured wall marker black square edge in metres")

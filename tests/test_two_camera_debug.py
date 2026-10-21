@@ -18,7 +18,7 @@ from test_tracking import hand
 
 
 def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=False,
-                 missing_right=False, capture_error=False, resolution=(1920, 1080)):
+                 missing_right=False, capture_error=False, resolution=(1920, 1080), scene=None, frame_count=70, force_uncalibrated=False):
     """Real app render/engine/archive path, synthetic cameras and stereo geometry."""
     geometry = rig()
     geometry['camera_indices'] = [0, 1]
@@ -43,21 +43,22 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
         def result(*_):
             if side == 1 and missing_right:
                 return None
-            world = hand(False, [0, 0, 0, 0] if index[0] < 25 else [1, 0, 0, 0])
+            world = hand(False, [0, 0, 0, 0] if index[0] < 55 else [1, 0, 0, 0])
             pixels = project(stereo, np.asarray(world)*.06 + [0., 0., 2.])[side]
-            gesture = Gesture.FIST if index[0] < 25 else Gesture.POINT
+            gesture = Gesture.FIST if index[0] < 55 else Gesture.POINT
             if side == 1 and disagree:
                 gesture = Gesture.PALM
+                world = hand(True, [1, 1, 1, 1])
             return Hand(pixels, world, 'Right', gesture)
         return result
 
     def key(_):
         index[0] += 1
-        return ord('q') if index[0] >= 36 else -1
+        return ord('q') if index[0] >= frame_count else -1
 
     camera.read.side_effect = read
     for side, tracker in enumerate(trackers):
-        tracker.detect.side_effect = detect(side)
+        tracker.detect_all.side_effect = (lambda *args, side=side: scene(index[0], side)) if scene else (lambda *args, detect=detect(side): ([result] if (result := detect(*args)) is not None else []))
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory)/'calibration.json'
         if calibration == 'valid':
@@ -69,10 +70,11 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
             path.write_text(json.dumps(geometry))
         args = parser().parse_args(['run', '--debug', '--left', '0', '--right', '1',
                                    '--calibration', str(path), '--output', directory, '--mute'])
+        args.uncalibrated = force_uncalibrated
         with patch.object(app, 'Cameras', return_value=camera), patch.object(app, 'Tracker', side_effect=trackers), \
                 patch.object(app, 'Chimes', return_value=audio), patch.object(app.time, 'monotonic', side_effect=tick), \
                 patch.object(Stereo, 'check_markers', return_value=(marker_ok, 'Show wall markers')) as markers, \
-                patch.object(app.cv2, 'imshow', side_effect=lambda _, image: displays.append(image.copy())), \
+                patch.object(app.cv2, 'imshow', side_effect=lambda _, image: displays.__setitem__(slice(None), [image.copy()])), \
                 patch.object(app.cv2, 'waitKey', side_effect=key), patch.object(app.cv2, 'getWindowProperty', return_value=1), \
                 patch.object(app.cv2, 'destroyAllWindows'), patch('magicpointer.desktop.Desktop') as desktop:
             if capture_error:
@@ -90,26 +92,27 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
 
 
 class TwoCameraDebugTests(unittest.TestCase):
-    def test_missing_invalid_and_wrong_pair_calibration_show_both_views_without_simulation(self):
+    def test_missing_invalid_and_wrong_pair_calibration_support_shared_uncalibrated_testing(self):
         for mode in ('missing', 'invalid', 'wrong_pair'):
             with self.subTest(mode=mode):
                 metadata, rows, panels, trackers, camera, audio, markers = dual_session(mode)
                 self.assertTrue(metadata['preview_only'])
                 self.assertFalse(metadata['stereo'])
-                self.assertIsNone(metadata['coordinate_units'])
+                self.assertEqual(metadata['coordinate_units'], 'activation_palm_sizes')
                 self.assertTrue(metadata['calibration_issue'])
                 self.assertEqual(metadata['camera_indices'], [0, 1])
-                self.assertEqual(panels[-1].shape, (760, 1280, 3))
-                np.testing.assert_array_equal(panels[-1][200, 20], [70, 30, 20])
-                np.testing.assert_array_equal(panels[-1][200, 660], [20, 70, 30])
+                self.assertEqual(panels[-1].shape, (900, 1280, 3))
+                np.testing.assert_array_equal(panels[-1][370, 20], [70, 30, 20])
+                np.testing.assert_array_equal(panels[-1][370, 660], [20, 70, 30])
                 self.assertTrue(all(len(row['cameras']) == 2 for row in rows))
-                self.assertTrue(all(row['observation'] is None and not row['events'] for row in rows))
+                self.assertTrue(any(row['observation'] is not None for row in rows))
+                self.assertTrue(any(e['kind'] == 'activate' for row in rows for e in row['events']))
                 self.assertTrue(all(not row['markers_verified'] for row in rows))
                 self.assertTrue(all(abs(row['pair_grab_skew_ms']-5.) < .001 for row in rows))
                 self.assertFalse(metadata['images_recorded'])
                 markers.assert_not_called()
                 for tracker in trackers:
-                    self.assertEqual(tracker.detect.call_count, len(rows))
+                    self.assertEqual(tracker.detect_all.call_count, len(rows))
                     tracker.close.assert_called_once()
                 camera.__exit__.assert_called_once()
                 audio.close.assert_called_once()
@@ -132,7 +135,7 @@ class TwoCameraDebugTests(unittest.TestCase):
         for kwargs in ({'marker_ok': False}, {'skew': .08}, {'disagree': True}, {'missing_right': True}):
             with self.subTest(kwargs=kwargs):
                 _, rows, panels, _, _, _, _ = dual_session(**kwargs)
-                self.assertEqual(panels[-1].shape, (760, 1280, 3))
+                self.assertEqual(panels[-1].shape, (900, 1280, 3))
                 self.assertTrue(all(row['observation'] is None and not row['events'] for row in rows))
                 self.assertTrue(all(row['reason'] != 'Tracking' for row in rows))
 
@@ -140,9 +143,9 @@ class TwoCameraDebugTests(unittest.TestCase):
         metadata, rows, _, _, _, _, markers = dual_session(resolution=(640, 480))
         self.assertTrue(metadata['preview_only'])
         self.assertFalse(metadata['stereo'])
-        self.assertIsNone(metadata['coordinate_units'])
+        self.assertEqual(metadata['coordinate_units'], 'activation_palm_sizes')
         self.assertIn('resolution', metadata['calibration_issue'])
-        self.assertTrue(all(row['observation'] is None for row in rows))
+        self.assertTrue(any(row['observation'] is not None for row in rows))
         markers.assert_not_called()
 
     def test_second_stream_failure_saves_partial_recording_and_closes_both_trackers(self):
@@ -162,3 +165,65 @@ class TwoCameraDebugTests(unittest.TestCase):
                     app.run(args)
                 cameras.assert_not_called()
                 desktop.assert_not_called()
+
+    def test_one_owner_countdown_other_hands_loss_recovery_palm_and_reselection(self):
+        from test_ownership_fusion import pose
+
+        def scene(frame, side):
+            own_gesture = Gesture.FIST if frame < 21 or 44 <= frame < 96 or 113 <= frame < 167 else Gesture.POINT
+            other_gesture = Gesture.FIST if 21 <= frame < 44 or frame >= 177 else Gesture.POINT
+            if 96 <= frame < 106:
+                other_gesture = Gesture.PALM
+            if 167 <= frame < 177:
+                own_gesture = Gesture.PALM
+            own = pose(own_gesture, 400.+side*70)
+            other = pose(other_gesture, 1300.+side*70, 'Left')
+            if side == 1 and 106 <= frame < 113:
+                return [other]
+            # Alternate model order every frame; order must not identify owner.
+            return [own, other] if frame % 2 else [other, own]
+
+        metadata, rows, panels, _, _, audio, _ = dual_session('missing', scene=scene, frame_count=230)
+        activates = [(index, row) for index, row in enumerate(rows)
+                     if any(event['kind'] == 'activate' for event in row['events'])]
+        self.assertEqual(len(activates), 3)
+        self.assertGreaterEqual(activates[0][0], 85)  # interrupted fists cannot accumulate
+        self.assertGreaterEqual(activates[1][0], 154)
+        self.assertGreaterEqual(activates[2][0], 218)
+        first_owner = activates[0][1]['selection']['owner_ids']
+        self.assertEqual(activates[1][1]['selection']['owner_ids'], first_owner)
+        self.assertNotEqual(activates[2][1]['selection']['owner_ids'], first_owner)
+        self.assertTrue(all(row['selection']['owner_ids'] == first_owner for row in rows[96:113]))
+        self.assertTrue(all(row['observation'] is None for row in rows[106:113]))
+        self.assertTrue(any(event['value'] == 'tracking lost' for row in rows[106:113] for event in row['events']))
+        self.assertTrue(any(row['selection']['owner_ids'] is None for row in rows[167:177]))
+        self.assertFalse(any(event['kind'] == 'click' for row in rows for event in row['events']))
+        self.assertEqual(sum(call.args == (True,) for call in audio.play.call_args_list), 3)
+        self.assertTrue(all('hands' in camera for row in rows for camera in row['cameras']))
+        self.assertEqual(panels[-1].shape, (900, 1280, 3))
+
+    def test_debug_banner_uses_large_shared_gesture_and_countdown_text(self):
+        with patch.object(app.cv2, 'putText', wraps=app.cv2.putText) as text:
+            dual_session('missing')
+        large = [call for call in text.call_args_list if call.args[4] >= 2.]
+        self.assertTrue(any(call.args[1] == 'FIST' for call in large))
+        self.assertTrue(any(call.args[1] == 'POINT' for call in large))
+        self.assertTrue(any('HOLD FIST' in call.args[1] for call in text.call_args_list))
+        self.assertTrue(any(call.args[1] == 'HAND LOCKED' for call in text.call_args_list))
+
+
+    def test_explicit_uncalibrated_mode_skips_even_valid_calibration_and_markers(self):
+        metadata, rows, _, _, _, _, markers = dual_session(force_uncalibrated=True)
+        self.assertFalse(metadata['stereo'])
+        self.assertEqual(metadata['coordinate_units'], 'activation_palm_sizes')
+        self.assertIn('explicitly', metadata['calibration_issue'])
+        self.assertTrue(any(event['kind'] == 'activate' for row in rows for event in row['events']))
+        markers.assert_not_called()
+
+    def test_uncalibrated_flag_cannot_enable_real_desktop_input(self):
+        args = parser().parse_args(['run', '--right', '1', '--uncalibrated'])
+        with patch.object(app.Stereo, 'load') as load, patch('magicpointer.desktop.Desktop') as desktop:
+            with self.assertRaisesRegex(ValueError, '--debug'):
+                app.run(args)
+            load.assert_not_called()
+            desktop.assert_not_called()

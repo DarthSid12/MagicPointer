@@ -125,7 +125,7 @@ class ScrollTests(unittest.TestCase):
 
 
     def test_main_preview_displays_latched_scroll_and_no_desktop_input(self):
-        poses = ([Gesture.FIST]*12 + [Gesture.POINT]*6 + [camera_pose()]*20 +
+        poses = ([Gesture.FIST]*55 + [Gesture.POINT]*6 + [camera_pose()]*20 +
                  [camera_pose(30., thumb=True)]*30 + [Gesture.POINT]*8 + [Gesture.PALM]*8)
         # Check feedback text through the real rendering/dispatch loop.
         import magicpointer.app as app
@@ -172,10 +172,10 @@ class ObservationTests(unittest.TestCase):
         stereo, left, right = self.pair()
         right.world = []
         obs, _ = observe(left, right, stereo=stereo, scrolling=True)
-        self.assertIsNone(obs.scroll_pitch)
+        self.assertIsNone(obs)
         right.gesture = Gesture.PALM
         obs, _ = observe(left, right, stereo=stereo, scrolling=True)
-        self.assertEqual(obs.gesture, Gesture.PALM)
+        self.assertIsNone(obs)
 
     def test_mono_preview_uses_model_pitch_without_depth_claim(self):
         sample = camera_pose(-25.)

@@ -27,7 +27,7 @@ def read_archive(directory):
 
 class DebugRecordingTests(unittest.TestCase):
     def test_main_debug_automatically_records_entire_session_including_no_hand(self):
-        poses = [None]*3+[Gesture.FIST]*12+[Gesture.POINT]*6+[camera_pose()]*20+[camera_pose(30., thumb=True)]*25
+        poses = [None]*3+[Gesture.FIST]*55+[Gesture.POINT]*6+[camera_pose()]*20+[camera_pose(30., thumb=True)]*25
         with tempfile.TemporaryDirectory() as directory:
             result, _, _, _, _ = debug_session(poses, directory)
             metadata, rows, summary = read_archive(directory)

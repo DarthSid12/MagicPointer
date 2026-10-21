@@ -9,7 +9,9 @@ from .engine import Engine, Gesture, Observation
 from .debug_log import DebugLog
 from .stereo import Stereo
 from .tracking import Tracker, distance, gesture_metrics
-from .tilt import measure_wrist, direction_pitch
+from .tilt import measure, measure_wrist, direction_pitch
+from .fusion import combine
+from .ownership import HandOwner
 
 COLORS = {"inactive": (150, 150, 150), "active": (70, 210, 70),
           "click": (220, 120, 240), "scroll": (240, 180, 30), "unavailable": (0, 160, 255)}
@@ -30,34 +32,50 @@ def draw_hand(image, hand, color):
         cv2.circle(image, tuple(point), 4, color, -1)
 
 
-def debug_views(frames, hands, indices, color):
-    """Both raw views with independent hand overlays; never records images."""
-    if len(frames) == 1:
-        panel = frames[0].image.copy()
-        draw_hand(panel, hands[0], color)
-        return cv2.resize(panel, (960, 540))
-    panel = np.full((760, 1280, 3), 25, dtype=np.uint8)
-    for column, (frame, hand, index) in enumerate(zip(frames, hands, indices)):
+def debug_views(frames, hands, indices, color, all_hands=None):
+    """All visible hands in gray, chosen hand highlighted; shared result above."""
+    panel = np.full((900, 1280, 3), 25, dtype=np.uint8)
+    for column, (frame, chosen, index) in enumerate(zip(frames, hands, indices)):
         image = frame.image.copy()
-        draw_hand(image, hand, color)
+        for hand in (all_hands[column] if all_hands else []):
+            draw_hand(image, hand, (110, 110, 110))
+        draw_hand(image, chosen, color)
         height, width = image.shape[:2]
         scale = min(640/width, 360/height)
         resized = cv2.resize(image, (max(1, round(width*scale)), max(1, round(height*scale))))
         h, w = resized.shape[:2]
-        x, y = column*640+(640-w)//2, 190+(360-h)//2
+        start = column*640 if len(frames) == 2 else 320
+        x, y = start+(640-w)//2, 360+(360-h)//2
         panel[y:y+h, x:x+w] = resized
-        side = 'LEFT / primary' if column == 0 else 'RIGHT / secondary'
-        label = f'{side}: camera {index} | {width}x{height}'
-        pose = f'Pose estimate: {hand.gesture.value} | Hand: {hand.label}' if hand else 'NO HAND'
+        label = f'Camera {index} | {width}x{height} | {len(all_hands[column]) if all_hands else int(chosen is not None)} hands'
+        pose = f'View estimate: {chosen.gesture.value} | {chosen.label}' if chosen else 'No matched controlling hand'
         for line, text in enumerate((label, pose)):
-            cv2.putText(panel, text, (12+column*640, 577+line*25),
-                        cv2.FONT_HERSHEY_SIMPLEX, .57, color, 1, cv2.LINE_AA)
-        if hand:
-            metrics = gesture_metrics(hand.world)
+            cv2.putText(panel, text, (12+column*640, 747+line*25), cv2.FONT_HERSHEY_SIMPLEX, .57, color, 1, cv2.LINE_AA)
+        if chosen:
+            metrics = gesture_metrics(chosen.world)
             if metrics['valid']:
-                cv2.putText(panel, f"Thumb/index/middle/ring/little estimates: {metrics['signature']}",
-                            (12+column*640, 627), cv2.FONT_HERSHEY_SIMPLEX, .48, color, 1, cv2.LINE_AA)
+                cv2.putText(panel, f"Thumb/index/middle/ring/little: {metrics['signature']}",
+                            (12+column*640, 797), cv2.FONT_HERSHEY_SIMPLEX, .48, color, 1, cv2.LINE_AA)
     return panel
+
+
+def large_gesture(panel, selection, owner, engine, color, ready=True, available=True):
+    label = selection.combined.gesture.value.upper() if selection.combined else ('OWNER PAUSED' if owner.owner else 'SHOW ONE FIST')
+    if not ready:
+        status = 'INPUT PAUSED - CHECK CAMERA PAIR / WALL MARKERS'
+    elif owner.owner:
+        status = 'HAND LOCKED' if engine.active else 'HAND LOCKED - HOLD FIST TO RESUME'
+        if not available:
+            status = 'INPUT PAUSED - CHECK BOTH VIEWS'
+        if selection.combined is None:
+            status = 'INPUT PAUSED - RETURN THE SELECTED HAND'
+    else:
+        status = selection.reason.upper()
+    for text, baseline, scale in ((label, 83, 2.6), (status, 147, 1.5)):
+        width = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 3)[0][0]
+        scale *= min(1., 1240/max(1, width))
+        width = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 3)[0][0]
+        cv2.putText(panel, text, ((1280-width)//2, baseline), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 3, cv2.LINE_AA)
 
 
 def index_only(hand):
@@ -66,46 +84,43 @@ def index_only(hand):
                                  ('index', 'middle', 'ring', 'little')] == [1, 0, 0, 0]
 
 
-def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1.):
-    """Keep stereo association/depth checks; ignore thumb only in latched mode."""
-    if left is None:
-        return None, "No reliable hand"
-    pitch, _ = measure_wrist(left)
-    point = index_only(left)
-    gesture = left.gesture
+def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1., combined=None):
+    hands = [left] if right is None else [left, right]
+    if combined is None:
+        combined, reason, _ = combine(hands, ignore_thumb=scrolling)
+        if combined is None:
+            return None, reason
+    pitch = None
+    shape, _ = measure(combined, allow_thumb=True)
+    if shape is not None:
+        directions = [direction_pitch(np.asarray(hand.world)[[5, 8, 9, 12]])[0] for hand in hands]
+        if all(value is not None for value in directions):
+            pitch = float(np.mean(directions))
     if stereo is None:
-        points = left.pixels / mono_scale
-        return Observation(gesture, (*points[0], 0.), (*points[8], 0.), pitch, point), "Tracking"
-    if right is None or left.label != right.label or (not scrolling and left.gesture != right.gesture):
-        return None, "Hands/gestures disagree between cameras"
-    right_pitch, _ = measure_wrist(right)
-    point = point and index_only(right)
-    # Thumb landmarks are neither a scrolling signal nor needed for metric
-    # position. Poor thumb estimates must not invalidate the entire stereo pair.
-    indices = [0] + list(range(5, 21)) if scrolling or gesture == Gesture.SCROLL else list(range(21))
+        points = left.pixels/mono_scale
+        return Observation(combined.gesture, (*points[0], 0.), (*points[8], 0.), pitch, index_only(combined)), 'Combined gesture; approximate image-space pointer'
+    if right is None:
+        return None, 'Selected hand missing from a camera'
+    indices = [0]+list(range(5, 21)) if scrolling or combined.gesture == Gesture.SCROLL else list(range(21))
     points = stereo.reconstruct(left.pixels[indices], right.pixels[indices])
     if points is None or np.linalg.norm(points[0]) > 3.6576:
-        return None, "Depth unreliable or beyond 12-foot target range"
+        return None, 'Depth unreliable or beyond 12-foot target range'
     indexed = dict(zip(indices, points))
-    if pitch is not None and right_pitch is not None:
+    if shape is not None:
         pitch, _ = direction_pitch([indexed[i] for i in (5, 8, 9, 12)])
-    else:
-        pitch = None
-    if scrolling:
-        if Gesture.PALM in (left.gesture, right.gesture):
-            gesture = Gesture.PALM
-        elif ((gesture == Gesture.POINT and not point) or
-              (gesture == Gesture.FIST and right.gesture != Gesture.FIST)):
-            gesture = Gesture.UNKNOWN
-    return Observation(gesture, tuple(indexed[0]), tuple(indexed[8]), pitch, point), "Tracking"
+    return Observation(combined.gesture, tuple(indexed[0]), tuple(indexed[8]), pitch, index_only(combined)), 'Combined gesture; calibrated stereo position'
 
 
 def run(args):
+    if args.uncalibrated and not args.debug:
+        raise ValueError("Uncalibrated testing requires --debug; desktop control requires stereo calibration")
     if not args.debug and args.right is None:
         raise ValueError("Real pointer control needs two cameras. For one-camera preview use run --debug")
     two_cameras = args.right is not None
     stereo, calibration_issue = None, None
-    if two_cameras:
+    if args.uncalibrated:
+        calibration_issue = 'Uncalibrated testing requested explicitly'
+    if two_cameras and not args.uncalibrated:
         try:
             stereo = Stereo.load(args.calibration)
             if stereo.data.get("camera_indices") != [args.left, args.right]:
@@ -116,11 +131,13 @@ def run(args):
             stereo, calibration_issue = None, str(error)
     preview_only = two_cameras and stereo is None
     engine = Engine(width=args.workspace_width * (10 if stereo is None else 1),
-                    height=args.workspace_height * (10 if stereo is None else 1), mirror_x=args.mirror_x)
+                    height=args.workspace_height * (10 if stereo is None else 1), mirror_x=args.mirror_x,
+                    activation_dwell=2.5)
+    owner = HandOwner(2 if two_cameras else 1)
+    previous_key = None
     trackers, audio, desktop = [], None, None
     log = None
     window = "MagicPointer - Q / Escape stops"
-    current_label = None
     mono_scale = 1.
     verified, verification_count = not two_cameras, 0
     next_marker_check = 0.
@@ -130,15 +147,17 @@ def run(args):
             log = DebugLog(args.output, {'camera_indices': [args.left] + ([args.right] if two_cameras else []),
                            'requested_fps': args.fps, 'stereo': stereo is not None,
                            'preview_only': preview_only, 'calibration_issue': calibration_issue,
+                           'gesture_recognition': 'palm-aligned landmark fusion', 'fusion_version': 1,
+                           'fused_landmarks_frame': 'normalized palm', 'max_hands_per_view': args.max_hands,
                            'workspace_width': engine.width, 'workspace_height': engine.height,
-                           'mirror_x': engine.mirror_x, 'coordinate_units': None if preview_only else ('metres' if stereo else 'activation_palm_sizes'),
+                           'mirror_x': engine.mirror_x, 'coordinate_units': 'metres' if stereo else 'activation_palm_sizes',
                            'dwell_seconds': engine.dwell, 'activation_dwell_seconds': engine.activation_dwell,
                            'loss_timeout_seconds': engine.loss_timeout,
                            'termination': 'normal'})
         # Verify model/dependencies before opening camera devices.
-        trackers.append(Tracker(args.model))
+        trackers.append(Tracker(args.model, num_hands=args.max_hands))
         if two_cameras:
-            trackers.append(Tracker(args.model))
+            trackers.append(Tracker(args.model, num_hands=args.max_hands))
         if not args.debug:
             from .desktop import Desktop
             desktop = Desktop()
@@ -150,15 +169,17 @@ def run(args):
                 calibration_issue = "Camera resolution differs from calibration; recalibrate at this resolution"
                 verified = False
                 if log:
-                    log.metadata.update(stereo=False, preview_only=True, calibration_issue=calibration_issue, coordinate_units=None)
+                    log.metadata.update(stereo=False, preview_only=True, calibration_issue=calibration_issue, coordinate_units='activation_palm_sizes')
+                engine.width = args.workspace_width*10
+                engine.height = args.workspace_height*10
             if log:
-                log.metadata["cameras"] = cameras.info
+                log.metadata.update(cameras=cameras.info, workspace_width=engine.width, workspace_height=engine.height)
             if preview_only:
-                print("TWO-CAMERA PREVIEW: no depth or joint pointer simulation until calibration is valid.")
+                print("UNCALIBRATED TEST: shared gestures and approximate virtual pointer; no metric depth.")
                 print("Calibration:", calibration_issue)
             print("Camera negotiated settings:", cameras.info)
             print("DEBUG: preview only; no OS pointer input" if args.debug else "STEREO CONTROL: Q/Escape or close window to stop")
-            print("Hold fist 0.45 s to activate; hold gestures 0.18 s. Return to index-only between clicks.")
+            print("Show one fist for 2.5 seconds to select that hand; open its palm to release. Other hands are ignored.")
             print("Two fingers toward screen: hold steady to set scroll neutral; tilt up/down. Index-only exits scrolling.")
             start, count, measured_fps = time.monotonic(), 0, 0.
             last_action, action_until = "", 0.
@@ -177,23 +198,21 @@ def run(args):
                     elif not good:
                         raise ValueError(marker_message)
                     next_marker_check = now + 1.
-                hands = [tracker.detect(frame.image, frame.grabbed_at) for tracker, frame in zip(trackers, frames)]
-                observation, reason = None, "No reliable hand"
+                detections = [tracker.detect_all(frame.image, frame.grabbed_at) for tracker, frame in zip(trackers, frames)]
+                selection = owner.select(detections, frames, now, stereo=stereo, scrolling=engine.scrolling)
+                hands = selection.hands or [None]*len(frames)
+                observation, reason = None, selection.reason
                 left = hands[0]
-                if preview_only:
-                    reason = "Preview only: calibrate this camera pair to enable depth and virtual pointer"
-                elif not verified:
+                if stereo and not verified:
                     reason = marker_message
                 elif not paired:
                     reason = "Camera pair timing mismatch"
-                elif left is not None:
+                elif selection.combined is not None:
                     if stereo is None and not engine.active:
                         mono_scale = max(10., float(np.linalg.norm(left.pixels[0]-left.pixels[9])))
                     observation, reason = observe(left, hands[1] if two_cameras else None,
                                                   stereo=stereo, scrolling=engine.scrolling,
-                                                  mono_scale=mono_scale)
-                    if engine.active and left.label != current_label:
-                        observation, reason = None, "Controlling hand changed"
+                                                  mono_scale=mono_scale, combined=selection.combined)
                 # Reject implausible same-label hand switches in metric stereo mode.
                 if observation is not None and stereo and engine.active and previous_wrist is not None:
                     elapsed = now - previous_wrist_time
@@ -201,14 +220,24 @@ def run(args):
                         observation, reason = None, "Hand moved too abruptly; reacquire"
                 if observation is not None:
                     previous_wrist, previous_wrist_time = observation.wrist, now
+                if observation is None and not owner.owner:
+                    owner.candidate = owner.since = None
+                    selection.progress = 0.
                 engine_now = time.monotonic()
+                if not engine.active and selection.key != previous_key:
+                    engine.step(None, engine_now)
+                previous_key = selection.key
                 events = engine.step(observation, engine_now)
+                if owner.owner and owner.release_ready and engine.active:
+                    events += engine.stop('open palm')
                 for event in events:
                     if event.kind == "activate":
-                        current_label = left.label
+                        owner.lock(selection.key)
                         audio.play(True)
                     elif event.kind == "deactivate":
-                        current_label, previous_wrist = None, None
+                        previous_wrist = None
+                        if event.value == 'open palm':
+                            owner.release()
                         audio.play(False)
                     elif event.kind == "move" and desktop:
                         desktop.move(event.value)
@@ -220,6 +249,12 @@ def run(args):
                         last_action, action_until = f"scroll {event.value:+d}", now + .3
                         if desktop:
                             desktop.scroll(event.value)
+                if owner.owner and owner.release_ready:
+                    owner.release()
+                    if not any(event.kind == 'deactivate' for event in events):
+                        audio.play(False)
+                if observation is None:
+                    selection.reason = reason
                 state = "inactive" if not engine.active else "active"
                 if observation is None:
                     state = "unavailable"
@@ -229,18 +264,19 @@ def run(args):
                     state = "click"
                 if log:
                     log.append(frames, hands, observation, engine, events, engine_now,
-                               reason=reason, paired=paired, verified=verified, state=state)
+                               reason=reason, paired=paired, verified=verified, state=state,
+                               detections=detections, ownership=owner, selection=selection)
                 color = COLORS[state]
                 if args.debug:
-                    panel = debug_views(frames, hands, [args.left, args.right], color)
+                    panel = debug_views(frames, hands, [args.left, args.right], color, detections)
                 else:
                     panel = np.full((540, 960, 3), (25, 25, 25), dtype=np.uint8)
                 # Primary-camera raw view is intentionally labelled: controls mirror X by default.
                 title = "DEBUG / NO DESKTOP INPUT" if args.debug else "STEREO / DESKTOP CONTROL"
                 if args.debug and two_cameras:
-                    title = "TWO-CAMERA DEBUG / NO OS INPUT / " + ("PREVIEW ONLY" if preview_only else "CALIBRATED STEREO")
+                    title = "TWO-CAMERA DEBUG / NO OS INPUT / " + ("UNCALIBRATED TEST" if preview_only else "CALIBRATED STEREO")
                 lines = [title,
-                         f"State: {state} | Pose estimate: {left.gesture.value if left else 'none'}" +
+                         f"State: {state} | Shared gesture: {selection.combined.gesture.value if selection.combined else 'unavailable'}" +
                          (" (clicks ignored)" if engine.scrolling else ""),
                          reason if observation is None else (last_action if now < action_until else "Tracking"),
                          f"Processing: {measured_fps:.1f} FPS | Q / Esc / close window to stop"]
@@ -253,17 +289,20 @@ def run(args):
                     lines.append(feedback + " | Index-only exits")
                 if args.debug and two_cameras:
                     skew = abs(frames[0].grabbed_at-frames[1].grabbed_at)*1000
-                    depth = f"Wrist range: {np.linalg.norm(observation.wrist):.2f} m" if observation and stereo else "Depth unavailable"
+                    depth = f"Wrist range: {np.linalg.norm(observation.wrist):.2f} m" if observation and stereo else "NO METRIC DEPTH - approximate pointer"
                     lines.append(f"Pair grab skew: {skew:.1f} ms ({'OK' if paired else 'over 40 ms'}) | {depth}")
                 if log:
                     lines.append("REC: diagnostic data (auto-saved on exit)")
                 for i, line in enumerate(lines):
-                    cv2.putText(panel, line, (15, 27+i*26), cv2.FONT_HERSHEY_SIMPLEX, .58, (0, 0, 0), 4)
-                    cv2.putText(panel, line, (15, 27+i*26), cv2.FONT_HERSHEY_SIMPLEX, .58, color, 1)
+                    y = 192+i*22 if args.debug else 27+i*26
+                    cv2.putText(panel, line, (15, y), cv2.FONT_HERSHEY_SIMPLEX, .50 if args.debug else .58, (0, 0, 0), 4)
+                    cv2.putText(panel, line, (15, y), cv2.FONT_HERSHEY_SIMPLEX, .50 if args.debug else .58, color, 1)
+                if args.debug:
+                    large_gesture(panel, selection, owner, engine, color, ready=paired and (not stereo or verified), available=observation is not None)
                 for i, (name, value) in enumerate(COLORS.items()):
                     cv2.putText(panel, name, (15+i*185, panel.shape[0]-18), cv2.FONT_HERSHEY_SIMPLEX, .5, value, 1)
                 # Small virtual screen shows motion even when using just one camera.
-                cursor_x, cursor_y = (1050, 30) if args.debug and len(frames) == 2 else (730, 120)
+                cursor_x, cursor_y = (1050, 190) if args.debug else (730, 120)
                 cv2.rectangle(panel, (cursor_x, cursor_y), (cursor_x+215, cursor_y+135), (220, 220, 220), 1)
                 if engine.active:
                     cv2.circle(panel, (cursor_x+round(engine.cursor[0]*215), cursor_y+round(engine.cursor[1]*135)), 5, color, -1)
