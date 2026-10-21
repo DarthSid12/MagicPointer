@@ -375,3 +375,12 @@ The live local archive is `diagnostics/debug-20261021T233028Z-b47554b5.zip` and 
 not committed. B8 remains open for actual multi-hand confirmation. B6 thumb-estimate
 accuracy and B7 click/scroll entry timing were not independently changed by this
 work. Calibrated hardware/12-foot acceptance remains pending.
+
+[Ownership/fusion CI run 39694283068](https://github.com/Himir-Desai/MagicPointer/actions/runs/39694283068)
+passed on integration commit `98f6295` for Windows and macOS with Python 3.11:
+installation, dependency checks, complete regression suite, CLI startup, official
+model download and real four-hand model blank-frame inference. The watcher briefly
+lost its network connection; the final run/job API result independently confirmed
+success for both jobs. No test rerun or code correction was needed. Live hand
+selection and fusion accuracy remain pending user testing; B8 stays open for that
+confirmation. Rollback foundation commit `60c9be8` was separately snapshot-tested.
