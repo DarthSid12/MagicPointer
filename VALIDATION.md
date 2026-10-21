@@ -275,3 +275,38 @@ video is requested and no runtime change is needed.
 Feature 11 clarification: data-only preference confirmed. Documentation and ledger
 updated; whitespace checks passed. No tests rerun for this documentation-only
 confirmation; runtime remains the CI-validated implementation above.
+
+## Feature 12: two-camera debug preview and calibrated stereo simulation
+
+Two-camera debug now renders both raw feeds side by side with per-view hand
+boxes/skeletons, camera indices, handedness/pose/finger estimates, pair grab skew
+and calibrated wrist range/virtual pointer when available. Missing, invalid,
+wrong-index or wrong-resolution calibration leaves a labelled preview without
+joint pointer simulation. Valid calibrated mode retains wall-marker, timing,
+hand agreement, depth and tracking-loss checks. Normal desktop control still
+requires calibration. Both preview modes record only diagnostic data.
+
+Local final checks: 86 tests run, 85 passed, one Windows-only ABI check skipped.
+New end-to-end synthetic coverage exercises both feeds and trackers, all four
+calibration-preview fallbacks, marker/hand/timing rejection with visible feeds,
+calibrated metric activation and pointer simulation, two-stream archive contents,
+partial capture-error archiving and cleanup, and strict real-control calibration.
+Existing mono debug, scroll and recording regressions also passed. CLI help and
+diff whitespace checks passed. Synthetic pre-calibration and calibrated panels
+were rendered and visually inspected for legibility, layout and virtual pointer.
+
+A live macOS smoke test opened camera indices 0 and 1 simultaneously at negotiated
+1920x1080 and approximately 30 FPS, initialized both real trackers, displayed 18
+pairs, saved a data-only archive and closed successfully. Desktop construction was
+explicitly blocked in the test. The archive was checked for exactly the three JSON
+files, 18 two-camera samples, no accepted observations/events in uncalibrated mode,
+no image recording and normal termination. The local archive is
+`diagnostics/debug-20261021T230215Z-300b51ff.zip` (not committed). A separate probe
+found usable indices 0-3; these are device indices, not verified physical model
+identities. The user should select the intended pair by viewing their feeds.
+
+There is no calibration.json for this rig, so live calibrated depth/gesture
+accuracy, wall-marker acceptance, long-run throughput and Windows hardware have
+not been established by this prompt. Calibrated mode is covered with synthetic
+stereo geometry and mocked marker results; actual marker geometry retains its
+existing unit coverage. No camera images or video were saved.

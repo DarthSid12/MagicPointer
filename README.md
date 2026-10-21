@@ -82,6 +82,32 @@ Mono preview estimates scale from palm size at activation. It cannot measure
 stereo depth or establish 12-foot accuracy. Only one hand is tracked per view.
 Keep other hands out of view while controlling the pointer.
 
+## Try two cameras
+
+```sh
+python -m magicpointer run --debug --left 0 --right 1 --fps 30
+```
+
+The window shows **both feeds side by side**, with camera indices, independent
+hand boxes/skeletons, handedness and finger/pose estimates. It also shows pair grab
+timing and, when available, calibrated wrist range and a virtual pointer. Debug
+mode sends no OS pointer, click or scroll input. Data-only recording automatically
+includes both cameras in the same diagnostic ZIP; no images/video/audio are saved.
+
+Before calibration, or if calibration cannot be loaded or does not match the
+selected indices/resolution, it starts in **PREVIEW ONLY**. Both views and model
+estimates remain available, but depth and joint pointer simulation are disabled.
+The console and archive explain why calibration was unavailable. After completing
+calibration, restart the same command: **CALIBRATED STEREO** checks wall markers
+before enabling the usual fist/point/click/scroll virtual-pointer simulation.
+Pair timing, hand agreement, depth validity and tracking-loss checks still apply.
+
+Use `python -m magicpointer cameras --limit 4 --fps 30` to probe camera indices,
+then select the pair you want with `--left` and `--right`. Index numbers may
+include built-in or virtual cameras and can change after reconnecting devices.
+The feeds are labelled raw views, with pointer X mirroring controlled separately.
+Q, Escape, closing the window or Ctrl+C stops both streams and saves the archive.
+
 ## Prepare and calibrate the fixed stereo rig
 
 Place both 1080p cameras near the TV with overlapping views and a rigid mount.
@@ -130,8 +156,10 @@ python -m magicpointer run --debug --left 0 --right 1 --fps 30
 python -m magicpointer run --left 0 --right 1 --fps 30
 ```
 
-Both commands load `calibration.json` and verify the wall markers before allowing
-activation. Marker verification replaces repeating the full checkerboard process
+With a matching `calibration.json`, debug verifies the wall markers before
+allowing simulated activation. Without usable calibration, debug shows only the
+two-camera preview described above. Real desktop control always requires valid
+calibration and marker verification. Marker verification replaces repeating the full checkerboard process
 when the rig stays fixed. During use, visible markers are checked periodically;
 a detected displacement stops the app and requires recalibration. Hidden markers
 cannot reveal a moved rig, so keep them visible when possible.

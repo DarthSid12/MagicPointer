@@ -61,6 +61,7 @@ class DebugLog:
                   'cameras': [{'grabbed_at': frame.grabbed_at,
                                'image_size': [frame.image.shape[1], frame.image.shape[0]],
                                'hand': hand_sample(hand)} for frame, hand in zip(frames, hands)],
+                  'pair_grab_skew_ms': abs(frames[0].grabbed_at-frames[1].grabbed_at)*1000 if len(frames) == 2 else None,
                   'observation': asdict(observation) if observation else None,
                   'reason': reason, 'pair_timing_valid': paired, 'markers_verified': verified,
                   'state': state, 'active': engine.active, 'scrolling': engine.scrolling,
