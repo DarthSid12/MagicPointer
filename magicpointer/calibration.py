@@ -8,7 +8,7 @@ from .cameras import Cameras
 from .stereo import calibrate_views, markers
 
 
-def targets(directory, square_mm=25., marker_mm=200.):
+def targets(directory, square_mm=25., marker_mm=80.):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     # SVG dimensions preserve physical scale when printed at 100%, no fit-to-page.
@@ -22,35 +22,41 @@ def targets(directory, square_mm=25., marker_mm=200.):
         f'<rect x="{margin+x*square_mm}" y="{margin+y*square_mm}" width="{square_mm}" height="{square_mm}"/>'
         for y in range(7) for x in range(10) if (x+y) % 2 == 0])
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    cards = []
+    card_width, card_height = marker_mm * 1.625, marker_mm * 1.675
     for marker_id in (0, 1):
         image = cv2.aruco.generateImageMarker(dictionary, marker_id, 6)
         cell = marker_mm / 6
-        width = marker_mm + 2*cell
-        header = marker_mm * .14
-        height = width + 2*header
-        inset = cell * .55
-        # Decoration stays outside the full one-cell white quiet zone. All
-        # dimensions scale together; the encoded black square stays marker_mm.
-        text_style = 'font-family="Helvetica,Arial,sans-serif"'
-        svg(f"marker-{marker_id}.svg", width, height, [
-            f'<title>MagicPointer wall marker {marker_id}</title>',
-            f'<desc>ArUco DICT_4X4_50, ID {marker_id}. Black square {marker_mm:g} mm. Print at 100% scale.</desc>',
-            f'<g {text_style}>',
-            f'<rect x="{inset}" y="{header*.32}" width="{marker_mm*.018}" height="{header*.43}" rx="{marker_mm*.009}" fill="#168575"/>',
-            f'<text x="{inset+marker_mm*.035}" y="{header*.58}" font-size="{marker_mm*.035}" font-weight="700" fill="#263a40">MagicPointer</text>',
-            f'<text x="{inset+marker_mm*.035}" y="{header*.83}" font-size="{marker_mm*.016}" letter-spacing="{marker_mm*.003}" fill="#68777c">WALL REFERENCE</text>',
-            f'<text x="{width-inset}" y="{header*.70}" text-anchor="end" font-size="{marker_mm*.060}" font-weight="700" fill="#263a40">0{marker_id}</text>',
-            '</g>',
-            '<g id="aruco-pattern" fill="#000000" shape-rendering="crispEdges">',
-            *[f'<rect x="{(x+1)*cell}" y="{header+(y+1)*cell}" width="{cell}" height="{cell}"/>'
+        # A full white cell around the unchanged code isolates it from the art.
+        quiet = marker_mm * 4/3
+        white_x = (card_width - quiet)/2
+        pattern_x = white_x + cell
+        pattern_y = white_x + cell
+        card = [
+            f'<title>Wall reference {marker_id}: {marker_mm:g} mm black square</title>',
+            f'<rect width="{card_width}" height="{card_height}" fill="#ede8dd"/>',
+            f'<path d="M 0 {marker_mm*.39} Q {marker_mm*.43} {marker_mm*.39} {marker_mm*.43} 0 L 0 0 Z" fill="#bcc4b5"/>',
+            f'<path d="M {card_width} {card_height-marker_mm*.42} Q {card_width-marker_mm*.43} {card_height-marker_mm*.42} {card_width-marker_mm*.43} {card_height} L {card_width} {card_height} Z" fill="#bcc4b5"/>',
+            f'<rect x="{marker_mm*.04}" y="{marker_mm*.04}" width="{card_width-marker_mm*.08}" height="{card_height-marker_mm*.08}" fill="none" stroke="#a39885" stroke-width="{marker_mm*.003}"/>',
+            f'<rect x="{white_x}" y="{white_x}" width="{quiet}" height="{quiet}" fill="white"/>',
+            f'<g id="aruco-pattern-{marker_id}" fill="#000000" shape-rendering="crispEdges">',
+            *[f'<rect x="{pattern_x+x*cell}" y="{pattern_y+y*cell}" width="{cell}" height="{cell}"/>'
               for y in range(6) for x in range(6) if image[y, x] == 0],
             '</g>',
-            f'<g {text_style} text-anchor="middle">',
-            f'<text x="{width/2}" y="{header+width+header*.28}" font-size="{marker_mm*.025}" font-weight="700" fill="#263a40">{marker_mm:g} mm black square</text>',
-            f'<text x="{width/2}" y="{header+width+header*.53}" font-size="{marker_mm*.018}" fill="#68777c">Print at 100% scale · Measure before mounting</text>',
-            f'<text x="{width/2}" y="{header+width+header*.78}" font-size="{marker_mm*.015}" letter-spacing="{marker_mm*.001}" fill="#68777c">DICT_4X4_50 / ID {marker_id} · Keep white border clear</text>',
-            '</g>',
-        ])
+            f'<text x="{card_width/2}" y="{card_height-marker_mm*.06}" text-anchor="middle" font-family="Georgia,serif" font-size="{marker_mm*.045}" fill="#655e50">{"I" if marker_id == 0 else "II"}</text>',
+        ]
+        svg(f"marker-{marker_id}.svg", card_width, card_height, card)
+        cards.append(card)
+    # Default 80-mm markers make two 130 x 134-mm cards on a portrait A4 sheet.
+    # Explicit larger sizes retain their physical dimensions on a larger sheet.
+    page_width = max(210., card_width + 20)
+    page_height = max(297., 2*card_height + 29)
+    gap = 9.
+    x = (page_width-card_width)/2
+    y = (page_height-2*card_height-gap)/2
+    svg("markers-pair.svg", page_width, page_height, [
+        f'<g transform="translate({x} {y+i*(card_height+gap)})">{"".join(card)}</g>'
+        for i, card in enumerate(cards)])
 
 
 def run(args):

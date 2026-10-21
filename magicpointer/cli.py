@@ -55,7 +55,8 @@ def parser():
     cmd = commands.add_parser("targets", help="generate printable checkerboard + ArUco markers 0/1")
     cmd.add_argument("--output", type=Path, default=Path("targets"))
     cmd.add_argument("--square-mm", type=positive, default=25.)
-    cmd.add_argument("--marker-mm", type=positive, default=200.)
+    cmd.add_argument("--marker-mm", type=positive, default=80.,
+                     help="black square edge in mm; default 80 fits both markers on one A4 sheet")
     cmd = commands.add_parser("download-model", help="download checksum-verified official hand model")
     cmd.add_argument("--output", type=Path, default=Path("models/hand_landmarker.task"))
     cmd = commands.add_parser("cameras", help="probe camera indices and report negotiated settings")

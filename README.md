@@ -148,23 +148,29 @@ frames; they are not hardware synchronized. Fast hand motion can reduce accuracy
 Generate printable targets:
 
 ```sh
-python -m magicpointer targets --square-mm 25 --marker-mm 200
+python -m magicpointer targets --square-mm 25
 ```
 
 Print the generated SVGs at **100% scale**, using tiled printing or a larger sheet
 where necessary. Measure the print: the checkerboard has 10 × 7 squares (9 × 6
 inner corners); `--square-mm` is one square's measured edge. Marker size is the
 outer **black square** edge, excluding the surrounding white margin.
-Wall-marker sheets include a labelled header, marker ID, and size reminder;
-keep the white border clear and measure the black square before mounting.
+The default wall markers have **80 mm black squares** in muted sage and ivory
+cards, with discreet I/II numbering (IDs 0/1). Print **`targets/markers-pair.svg`
+on one portrait A4 sheet at 100% / actual size**, then cut out the two 130 × 134 mm
+cards. Keep the full white border around each code. Individual SVGs are also
+provided. Explicit `--marker-mm` sizes above 80 mm produce a larger paired sheet;
+do not shrink it with fit-to-page. Smaller markers occupy fewer camera pixels,
+so check both cameras can detect them at the installed distance. Moving or
+resizing existing markers requires fresh calibration.
 
 Attach ArUco markers **0 and 1** (`DICT_4X4_50`) to the opposite wall so both are
 visible in both cameras. Record their black-square size and center-to-center
-spacing. The example below uses 20 cm markers separated by 1 m; substitute your
+spacing. The example below uses 8 cm markers separated by 1 m; substitute your
 actual measurements:
 
 ```sh
-python -m magicpointer calibrate --left 0 --right 1 --fps 30 --square-mm 25 --marker-size 0.20 --marker-spacing 1.00
+python -m magicpointer calibrate --left 0 --right 1 --fps 30 --square-mm 25 --marker-size 0.08 --marker-spacing 1.00
 ```
 
 Move and tilt the checkerboard through both cameras' shared field of view. Press
