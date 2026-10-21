@@ -310,3 +310,9 @@ accuracy, wall-marker acceptance, long-run throughput and Windows hardware have
 not been established by this prompt. Calibrated mode is covered with synthetic
 stereo geometry and mocked marker results; actual marker geometry retains its
 existing unit coverage. No camera images or video were saved.
+
+[Feature 12 CI run 39690791082](https://github.com/Himir-Desai/MagicPointer/actions/runs/39690791082)
+passed on `06fc40c` for Windows and macOS with Python 3.11: dependency installation,
+regression suite, CLI startup, model download and blank-frame inference. The live
+macOS preview test above additionally exercises real simultaneous capture;
+calibrated stereo hardware accuracy remains unverified.
