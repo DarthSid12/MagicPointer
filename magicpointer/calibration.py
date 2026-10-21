@@ -25,9 +25,32 @@ def targets(directory, square_mm=25., marker_mm=200.):
     for marker_id in (0, 1):
         image = cv2.aruco.generateImageMarker(dictionary, marker_id, 6)
         cell = marker_mm / 6
-        svg(f"marker-{marker_id}.svg", marker_mm + 2*cell, marker_mm + 2*cell, [
-            f'<rect x="{(x+1)*cell}" y="{(y+1)*cell}" width="{cell}" height="{cell}"/>'
-            for y in range(6) for x in range(6) if image[y, x] == 0])
+        width = marker_mm + 2*cell
+        header = marker_mm * .14
+        height = width + 2*header
+        inset = cell * .55
+        # Decoration stays outside the full one-cell white quiet zone. All
+        # dimensions scale together; the encoded black square stays marker_mm.
+        text_style = 'font-family="Helvetica,Arial,sans-serif"'
+        svg(f"marker-{marker_id}.svg", width, height, [
+            f'<title>MagicPointer wall marker {marker_id}</title>',
+            f'<desc>ArUco DICT_4X4_50, ID {marker_id}. Black square {marker_mm:g} mm. Print at 100% scale.</desc>',
+            f'<g {text_style}>',
+            f'<rect x="{inset}" y="{header*.32}" width="{marker_mm*.018}" height="{header*.43}" rx="{marker_mm*.009}" fill="#168575"/>',
+            f'<text x="{inset+marker_mm*.035}" y="{header*.58}" font-size="{marker_mm*.035}" font-weight="700" fill="#263a40">MagicPointer</text>',
+            f'<text x="{inset+marker_mm*.035}" y="{header*.83}" font-size="{marker_mm*.016}" letter-spacing="{marker_mm*.003}" fill="#68777c">WALL REFERENCE</text>',
+            f'<text x="{width-inset}" y="{header*.70}" text-anchor="end" font-size="{marker_mm*.060}" font-weight="700" fill="#263a40">0{marker_id}</text>',
+            '</g>',
+            '<g id="aruco-pattern" fill="#000000" shape-rendering="crispEdges">',
+            *[f'<rect x="{(x+1)*cell}" y="{header+(y+1)*cell}" width="{cell}" height="{cell}"/>'
+              for y in range(6) for x in range(6) if image[y, x] == 0],
+            '</g>',
+            f'<g {text_style} text-anchor="middle">',
+            f'<text x="{width/2}" y="{header+width+header*.28}" font-size="{marker_mm*.025}" font-weight="700" fill="#263a40">{marker_mm:g} mm black square</text>',
+            f'<text x="{width/2}" y="{header+width+header*.53}" font-size="{marker_mm*.018}" fill="#68777c">Print at 100% scale · Measure before mounting</text>',
+            f'<text x="{width/2}" y="{header+width+header*.78}" font-size="{marker_mm*.015}" letter-spacing="{marker_mm*.001}" fill="#68777c">DICT_4X4_50 / ID {marker_id} · Keep white border clear</text>',
+            '</g>',
+        ])
 
 
 def run(args):

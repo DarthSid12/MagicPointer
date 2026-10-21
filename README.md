@@ -155,6 +155,8 @@ Print the generated SVGs at **100% scale**, using tiled printing or a larger she
 where necessary. Measure the print: the checkerboard has 10 × 7 squares (9 × 6
 inner corners); `--square-mm` is one square's measured edge. Marker size is the
 outer **black square** edge, excluding the surrounding white margin.
+Wall-marker sheets include a labelled header, marker ID, and size reminder;
+keep the white border clear and measure the black square before mounting.
 
 Attach ArUco markers **0 and 1** (`DICT_4X4_50`) to the opposite wall so both are
 visible in both cameras. Record their black-square size and center-to-center
