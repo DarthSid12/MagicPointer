@@ -565,3 +565,24 @@ No live camera trial, false-positive measurement or ten-foot benefit is claimed.
 User subsequently explicitly authorized publishing. Commit 34fdd7a was pushed
 to origin/feat/adaptive-debug-detection; CI run 39713215389 was in progress at
 publication. Local validation above is complete.
+## B15 Gesture stability under landmark jitter
+
+Synthetic anatomical hands (relaxed pointing fingers, loosely curled others) were
+jittered per landmark in two views and run through fusion, ownership-equivalent
+stabilization and the engine with the app's retained-owner settings. Previous and
+revised code ran the same scripts. A session holds a fist, then point, left,
+point, right, point; it succeeds with exactly one left then one right click.
+
+| Landmark jitter | Previous success | Revised success | Activation median (2.5 s hold) |
+| --- | --- | --- | --- |
+| 3 mm | 96% | 100% | 3.0 s → 2.6 s |
+| 4 mm | 42% | 96% | 3.4 s → 2.8 s |
+| 5 mm | 2% | 63% | 4.0 s → 3.1 s |
+| 6 mm | 0% | 14% | 5.1 s → 3.7 s |
+
+Holding point or two-finger poses (without latched scrolling) for 33 simulated
+minutes per condition produced no false clicks before or after, at 5 and 6 mm.
+Variants that resumed dwell across a different pose, credited bridged frames, or
+used a symmetric thumb margin did produce false clicks and were rejected; see the
+report. Local regression run (Python 3.11): 146 tests, 145 passed, 1 Windows-only
+check skipped. Real-hand and live validation remain pending.

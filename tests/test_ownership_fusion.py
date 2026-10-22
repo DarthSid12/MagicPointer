@@ -112,6 +112,20 @@ class OwnershipTests(unittest.TestCase):
         self.assertEqual(selected.key, key)
         self.assertIsNotNone(selected.combined)
 
+    def test_owner_pose_keeps_last_state_through_an_uncertain_thumb_frame(self):
+        from test_tracking import thumb_at
+        def left_click(ip):
+            hand = pose(Gesture.LEFT)
+            hand.world = thumb_at(np.asarray(hand.world), ip)
+            hand.gesture = classify(hand.world)
+            return hand
+        selected = self.step([left_click(170.)], [left_click(170.)])
+        self.assertEqual(selected.combined.gesture, Gesture.LEFT)
+        self.owner.lock(selected.key)
+        selected = self.step([left_click(142.)], [left_click(142.)])
+        self.assertEqual(selected.combined.gesture, Gesture.LEFT)
+        self.assertEqual(self.owner.diagnostics['pairs'][0]['frame_gesture'], Gesture.UNKNOWN)
+
     def test_palm_release_is_available_even_if_engine_has_paused_for_tracking_loss(self):
         selected = self.step([pose()], [pose(x=600.)])
         self.owner.lock(selected.key)
