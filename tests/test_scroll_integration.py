@@ -160,6 +160,14 @@ class ObservationTests(unittest.TestCase):
         obs, _ = observe(left, right, stereo=stereo, scrolling=True)
         self.assertAlmostEqual(obs.scroll_pitch, 25., places=7)
 
+    def test_unused_occluded_fingers_do_not_reject_stereo_pointing(self):
+        stereo, left, right = self.pair()
+        right.pixels[13:21] += [0., 100.]  # hidden curled ring/little estimates disagree
+        obs, reason = observe(left, right, stereo=stereo)
+        self.assertIsNotNone(obs, reason)
+        right.pixels[8] += [0., 100.]  # the index tip itself must still agree
+        self.assertIsNone(observe(left, right, stereo=stereo)[0])
+
     def test_wrong_handedness_or_invalid_depth_never_produces_observation(self):
         stereo, left, right = self.pair()
         right.label = 'Left'

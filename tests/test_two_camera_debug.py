@@ -205,7 +205,9 @@ class TwoCameraDebugTests(unittest.TestCase):
         self.assertNotEqual(activates[1][1]['selection']['owner_ids'], first_owner)
         self.assertTrue(all(row['selection']['owner_ids'] == first_owner for row in rows[96:113]))
         self.assertTrue(all(row['observation'] is None for row in rows[106:113]))
-        self.assertTrue(all(row['active'] and row['engine_after']['paused'] for row in rows[106:113]))
+        # The first ~0.1 s of the gap is bridged; longer loss pauses. Neither emits input.
+        self.assertTrue(all(row['active'] and not row['events'] for row in rows[106:113]))
+        self.assertTrue(rows[112]['engine_after']['paused'])
         self.assertFalse(any(event['kind'] == 'deactivate' for row in rows[106:113] for event in row['events']))
         self.assertTrue(any(row['selection']['owner_ids'] is None for row in rows[167:177]))
         self.assertFalse(any(event['kind'] == 'click' for row in rows for event in row['events']))
@@ -248,7 +250,8 @@ class TwoCameraDebugTests(unittest.TestCase):
                                               skew=lambda frame: .08 if frame == 55 else .005)
         self.assertTrue(rows[55]['active'])
         self.assertIsNotNone(rows[55]['selection']['owner_ids'])
-        self.assertTrue(rows[55]['engine_after']['paused'])
+        # A single rejected pair is bridged by the grace period without input.
+        self.assertFalse(rows[55]['engine_after']['paused'])
         self.assertFalse(rows[55]['events'])
         self.assertIsNone(rows[56]['selection']['owner_ids'])
         self.assertTrue(any(event['kind'] == 'deactivate' and event['value'] == 'open palm' for event in rows[56]['events']))

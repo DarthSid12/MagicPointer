@@ -5,6 +5,17 @@ import math
 from .engine import Gesture
 
 CLASSIFIER_VERSION = 2
+# Extra thumb IP straightening (degrees) required before a tucked thumb counts as open.
+THUMB_HYSTERESIS_DEGREES = 5.
+
+SHAPES = {
+    (0, 0, 0, 0, 0): Gesture.FIST,
+    (0, 1, 0, 0, 0): Gesture.POINT,
+    (1, 1, 0, 0, 0): Gesture.LEFT,
+    (1, 1, 1, 0, 0): Gesture.RIGHT,
+    (0, 1, 1, 0, 0): Gesture.SCROLL,
+    (1, 1, 1, 1, 1): Gesture.PALM,
+}
 
 
 def distance(a, b):
@@ -50,14 +61,7 @@ def gesture_metrics(points):
     # a straight thumb laid across the palm from being counted as extended.
     thumb = 1 if thumb_angle > 145 and separation > .30 else (0 if thumb_angle < 140 or separation < .30 else -1)
     signature = (thumb, *fingers)
-    gesture = {
-        (0, 0, 0, 0, 0): Gesture.FIST,
-        (0, 1, 0, 0, 0): Gesture.POINT,
-        (1, 1, 0, 0, 0): Gesture.LEFT,
-        (1, 1, 1, 0, 0): Gesture.RIGHT,
-        (0, 1, 1, 0, 0): Gesture.SCROLL,
-        (1, 1, 1, 1, 1): Gesture.PALM,
-    }.get(signature, Gesture.UNKNOWN)
+    gesture = SHAPES.get(signature, Gesture.UNKNOWN)
     return {"valid": True, "classifier_version": CLASSIFIER_VERSION, "palm_size": palm, "fingers": measurements,
             "thumb": {"ip_degrees": thumb_angle, "separation_ratio": separation, "state": thumb},
             "signature": list(signature), "gesture": gesture.value}
@@ -65,6 +69,36 @@ def gesture_metrics(points):
 
 def classify(points):
     return Gesture(gesture_metrics(points)["gesture"])
+
+
+class PoseStabilizer:
+    """Per-hand hysteresis over the classifier's own measurements.
+
+    Fresh hands use the classifier unchanged. Afterwards an uncertain digit keeps
+    its last known state, and a tucked thumb needs THUMB_HYSTERESIS_DEGREES past
+    the open threshold to open. Closing uses the classifier's own threshold, so a
+    spurious open estimate is never sticky enough to hold a click pose. Clear
+    changes still switch on the first frame.
+    """
+
+    def __init__(self, reset_after=.25):
+        self.reset_after = reset_after
+        self.signature = self.time = None
+
+    def update(self, points, now):
+        metrics = gesture_metrics(points)
+        if not metrics["valid"]:
+            return Gesture.UNKNOWN
+        previous = self.signature
+        if previous is not None and not 0 <= now - self.time <= self.reset_after:
+            previous = None
+        signature = list(metrics["signature"])
+        if previous is not None:
+            if previous[0] == 0 and signature[0] == 1 and metrics["thumb"]["ip_degrees"] <= 145 + THUMB_HYSTERESIS_DEGREES:
+                signature[0] = 0
+            signature = [old if new == -1 else new for new, old in zip(signature, previous)]
+        self.signature, self.time = tuple(signature), now
+        return SHAPES.get(self.signature, Gesture.UNKNOWN)
 
 
 @dataclass

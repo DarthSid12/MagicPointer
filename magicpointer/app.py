@@ -101,7 +101,10 @@ def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1., co
         return Observation(combined.gesture, (*points[0], 0.), (*points[8], 0.), pitch, index_only(combined)), 'Combined gesture; approximate image-space pointer'
     if right is None:
         return None, 'Selected hand missing from a camera'
-    indices = [0]+list(range(5, 21)) if scrolling or combined.gesture == Gesture.SCROLL else list(range(21))
+    # Check the joints used for position and pitch, plus the thumb as click
+    # evidence outside scrolling; an occluded, unused curled finger must not
+    # reject the whole pair.
+    indices = [0, 5, 8, 9, 12] if scrolling or combined.gesture == Gesture.SCROLL else [0, 1, 2, 3, 4, 5, 8, 9, 12]
     points = stereo.reconstruct(left.pixels[indices], right.pixels[indices])
     if points is None or np.linalg.norm(points[0]) > 3.6576:
         return None, 'Depth unreliable or beyond 12-foot target range'
