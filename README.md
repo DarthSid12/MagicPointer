@@ -79,19 +79,32 @@ a forced process kill may leave that folder without a finalized ZIP. The `tilt`
 and `wrist-tilt` experiments continue saving their existing recordings; `collect`
 continues recording the labelled intervals selected with Space.
 
+Schema-2 debug archives additionally explain matching decisions: track histories,
+assignment costs and rejected pairs, per-finger disagreement, engine pre/post state,
+fist evidence, pause/recovery state and per-stage processing times. Session metadata
+records package/model/build versions; summary gives status counts and timing
+percentiles. Logging/render times are for the previous frame. Analyse an archive
+with `python scripts/analyze_debug.py diagnostics/debug-YOUR-SESSION.zip`.
+
+Fist selection counts 2.5 seconds of valid evidence. Unknown or missing samples
+for up to 0.4 seconds pause the countdown without crediting that time; another
+recognized gesture, a different hand ID or a longer gap resets it.
+
 Mono preview estimates scale from palm size at activation. It cannot measure
 stereo depth or establish 12-foot accuracy. The main app detects up to four hands per view by default (`--max-hands 1` through
 `8` changes that limit). Hold **one fist for 2.5 seconds** to choose the controlling
 hand and hear the activation chime. After selection, only that hand can control
 the virtual/real pointer; other hands are ignored for input. Open the selected
-hand's full palm to release it. The large debug banner shows the shared gesture,
+hand's full palm to release it. A matched full palm agreed by both camera
+estimates and the shared result releases immediately; otherwise hold it briefly. The large debug banner shows the shared gesture,
 fist countdown, hand lock or paused state so it can be read from farther away.
 
 Detection list order never identifies the owner. Spatial continuity preserves
 local hand IDs; ambiguous crossings or missing selected views pause input instead
 of selecting a different hand. Tracking loss retains ownership, although input
-deactivates after 0.30 seconds: return the same hand near its last tracked position
-and hold a fist again to resume. If tracking cannot be recovered, Q/Escape and
+pauses immediately without discarding activation: return the same hand near its
+last tracked position to resume. Recovery does not fire a held click chord; point
+or make a fist before clicking again. Scrolling captures a fresh neutral. If tracking cannot be recovered, Q/Escape and
 restart lets you select afresh. This is visual tracking, not biometric identity.
 
 ## Try two cameras
@@ -196,9 +209,10 @@ cannot reveal a moved rig, so keep them visible when possible.
 
 **Q, Escape, Ctrl+C, or closing the window stops the application.** An open palm
 also deactivates pointer control while keeping the application running. Camera
-failures end the app with a readable error; tracking loss stops input immediately
-and deactivates after 0.30 s. A processing stall over that threshold also requires
-reactivation.
+failures end the app with a readable error. Missing/rejected views or a processing
+stall pause input while retaining the selected owner and activation. There is no
+one-camera fallback. Input resumes with the same confidently matched hand, with
+pending click/scroll state cleared and pointer position rebased.
 
 ## Gestures
 
@@ -209,7 +223,7 @@ reactivation.
 | Index + thumb | One left click after 0.18 s of stable recognition |
 | Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |
 | Index + thumb + middle outside scrolling | One right click after 0.18 s of stable recognition |
-| Entire palm open | Stop input immediately; confirm deactivation after 0.18 s with a different chime |
+| Selected hand fully open | Stop input; two-view palm agreement releases immediately, otherwise confirm after 0.18 s; deactivation chime |
 
 Open the fingers for a click chord together: holding thumb-only long enough is a
 left click, even if you later add the middle finger. After a click, return to
@@ -229,7 +243,7 @@ frozen location without jumping; subsequent finger motion moves it from there.
 Exit scrolling before making a click. A fist also exits scrolling; a full palm
 still deactivates control. An invalid two-finger pose pauses scrolling immediately;
 after 0.30 s without valid pitch, hold steady to capture a new neutral. Tracking
-loss still deactivates control. A tilted straight pair takes priority over a
+loss pauses input while retaining the selected owner. A tilted straight pair takes priority over a
 fist-like classifier label while scrolling, provided its pitch remains valid.
 
 Stereo control uses triangulated finger direction in the primary camera's axes.

@@ -3,6 +3,9 @@ from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
+from importlib.metadata import version, PackageNotFoundError
+import subprocess
+import statistics
 import math
 from pathlib import Path
 import platform
@@ -30,10 +33,36 @@ def json_value(value):
 def hand_sample(hand):
     if hand is None:
         return None
+    pixels = hand.pixels.tolist() if hasattr(hand.pixels, 'tolist') else hand.pixels
+    geometry = None
+    if pixels and all(math.isfinite(value) for point in pixels for value in point):
+        geometry = {'bounding_box_pixels': [min(point[0] for point in pixels), min(point[1] for point in pixels),
+                                           max(point[0] for point in pixels), max(point[1] for point in pixels)],
+                    'palm_size_pixels': math.hypot(pixels[0][0]-pixels[9][0], pixels[0][1]-pixels[9][1])}
     return {'gesture_estimate': hand.gesture.value, 'handedness': hand.label,
             'handedness_score': hand.handedness_score, 'pixels': hand.pixels,
             'world_landmarks': hand.world, 'image_landmarks': hand.image_landmarks,
-            'metrics': gesture_metrics(hand.world)}
+            'metrics': gesture_metrics(hand.world), 'image_geometry': geometry}
+
+
+def runtime_info():
+    packages = {}
+    for name in ('mediapipe', 'numpy', 'opencv-contrib-python'):
+        try:
+            packages[name] = version(name)
+        except PackageNotFoundError:
+            packages[name] = None
+    try:
+        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                          cwd=Path(__file__).resolve().parents[1],
+                                          stderr=subprocess.DEVNULL, timeout=1, text=True).strip()
+        dirty = bool(subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'],
+                                             cwd=Path(__file__).resolve().parents[1], stderr=subprocess.DEVNULL, timeout=1, text=True).strip())
+    except (OSError, subprocess.SubprocessError):
+        revision, dirty = None, None
+    from .model import MODEL_SHA256
+    return {'dependencies': packages, 'git_revision': revision, 'git_dirty': dirty, 'model_sha256': MODEL_SHA256,
+            'architecture': platform.machine(), 'diagnostics_version': 2}
 
 
 class DebugLog:
@@ -41,13 +70,16 @@ class DebugLog:
         stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
         self.path = Path(output)/f'debug-{stamp}-{uuid.uuid4().hex[:8]}'
         self.path.mkdir(parents=True, exist_ok=False)
-        self.metadata = {'schema_version': 1, 'kind': 'debug-run',
+        self.metadata = {'schema_version': 2, 'kind': 'debug-run', **runtime_info(),
                          'created_utc': stamp, 'app_version': __version__,
                          'classifier_version': CLASSIFIER_VERSION,
                          'os': platform.system(), 'python': platform.python_version(),
                          'images_recorded': False, 'desktop_input': False, **metadata}
         self.started = time.monotonic()
         self.counts = Counter()
+        self.reasons = Counter()
+        self.timing_samples = {}
+        self.last_frame_time = None
         self.closed = False
         self._write('session.json', self.metadata)
         self.stream = (self.path/'samples.jsonl').open('w', encoding='utf-8')
@@ -56,7 +88,7 @@ class DebugLog:
     def _write(self, name, value):
         (self.path/name).write_text(json.dumps(json_value(value), allow_nan=False, indent=2), encoding='utf-8')
 
-    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state, detections=None, ownership=None, selection=None):
+    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state, detections=None, ownership=None, selection=None, timings=None, engine_before=None):
         sample = {'elapsed_seconds': now-self.started, 'monotonic_seconds': now,
                   'cameras': [{'grabbed_at': frame.grabbed_at,
                                'image_size': [frame.image.shape[1], frame.image.shape[0]],
@@ -70,7 +102,21 @@ class DebugLog:
                              'smoothed_degrees': engine.scroll.filtered,
                              'delta_degrees': engine.scroll.delta,
                              'down_steps_per_second': engine.scroll.speed},
-                  'events': [asdict(event) for event in events]}
+                  'events': [asdict(event) for event in events],
+                  'engine_before': engine_before, 'engine_after': engine.diagnostics(now),
+                  'timings_ms': timings or {},
+                  'frame_interval_ms': None if self.last_frame_time is None else (now-self.last_frame_time)*1000}
+        if sample['frame_interval_ms'] is not None:
+            self.timing_samples.setdefault('frame_interval_ms', []).append(sample['frame_interval_ms'])
+        self.last_frame_time = now
+        for name, value in (timings or {}).items():
+            self.timing_samples.setdefault(name, []).append(value)
+        self.reasons[reason] += 1
+        self.counts['paused_frames'] += engine.paused
+        self.counts['timing_rejected_frames'] += not paired
+        if ownership is not None:
+            sample['tracking_decisions'] = [tracker.diagnostics for tracker in ownership.locals]
+            sample['matching_decisions'] = ownership.diagnostics
         if detections is not None:
             for index, hands in enumerate(detections):
                 visible = ownership.visible[index] if ownership else {}
@@ -81,6 +127,7 @@ class DebugLog:
             sample['selection'] = {'owner_ids': ownership.owner, 'candidate_ids': ownership.candidate,
                                    'visible_ids': [list(view) for view in ownership.visible],
                                    'progress': selection.progress, 'reason': selection.reason,
+                                   'palm_since': ownership.palm_since, 'release_ready': ownership.release_ready,
                                    'shape_disagreement': selection.spread,
                                    'combined_hand': hand_sample(selection.combined)}
         self.stream.write(json.dumps(json_value(sample), allow_nan=False)+'\n')
@@ -96,7 +143,14 @@ class DebugLog:
             return
         self.stream.close()
         self._write('session.json', self.metadata)
-        self._write('summary.json', dict(self.counts))
+        timing = {}
+        for name, values in self.timing_samples.items():
+            if values:
+                ordered = sorted(values)
+                timing[name] = {'median': statistics.median(values),
+                                'p95': ordered[min(len(ordered)-1, math.ceil(.95*len(ordered))-1)],
+                                'max': max(values)}
+        self._write('summary.json', {**self.counts, 'rejection_and_status_counts': dict(self.reasons), 'timings_ms': timing})
         archive = self.path.with_suffix('.zip')
         with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as bundle:
             for name in ('session.json', 'samples.jsonl', 'summary.json'):

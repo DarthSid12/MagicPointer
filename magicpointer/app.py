@@ -132,7 +132,7 @@ def run(args):
     preview_only = two_cameras and stereo is None
     engine = Engine(width=args.workspace_width * (10 if stereo is None else 1),
                     height=args.workspace_height * (10 if stereo is None else 1), mirror_x=args.mirror_x,
-                    activation_dwell=2.5)
+                    activation_dwell=2.5, retain_activation_on_loss=True, activation_grace=.4)
     owner = HandOwner(2 if two_cameras else 1)
     previous_key = None
     trackers, audio, desktop = [], None, None
@@ -152,7 +152,9 @@ def run(args):
                            'workspace_width': engine.width, 'workspace_height': engine.height,
                            'mirror_x': engine.mirror_x, 'coordinate_units': 'metres' if stereo else 'activation_palm_sizes',
                            'dwell_seconds': engine.dwell, 'activation_dwell_seconds': engine.activation_dwell,
-                           'loss_timeout_seconds': engine.loss_timeout,
+                           'loss_timeout_seconds': engine.loss_timeout, 'retain_activation_on_loss': True,
+                           'activation_grace_seconds': engine.activation_grace,
+                           'palm_release_policy': 'immediate two-view and fused agreement, otherwise 0.18s',
                            'termination': 'normal'})
         # Verify model/dependencies before opening camera devices.
         trackers.append(Tracker(args.model, num_hands=args.max_hands))
@@ -183,8 +185,12 @@ def run(args):
             print("Two fingers toward screen: hold steady to set scroll neutral; tilt up/down. Index-only exits scrolling.")
             start, count, measured_fps = time.monotonic(), 0, 0.
             last_action, action_until = "", 0.
+            previous_log_ms = previous_render_ms = 0.
             while True:
+                phase = time.perf_counter()
                 frames = cameras.read()
+                timings = {'capture_ms': (time.perf_counter()-phase)*1000,
+                           'previous_log_ms': previous_log_ms, 'previous_render_ms': previous_render_ms}
                 now = time.monotonic()
                 paired = (abs(frames[0].grabbed_at-frames[1].grabbed_at) <= .04) if two_cameras else True
                 if stereo:
@@ -198,8 +204,17 @@ def run(args):
                     elif not good:
                         raise ValueError(marker_message)
                     next_marker_check = now + 1.
-                detections = [tracker.detect_all(frame.image, frame.grabbed_at) for tracker, frame in zip(trackers, frames)]
+                detections = []
+                for index, (tracker, frame) in enumerate(zip(trackers, frames)):
+                    phase = time.perf_counter()
+                    detections.append(tracker.detect_all(frame.image, frame.grabbed_at))
+                    timings[f'detect_camera_{index}_ms'] = (time.perf_counter()-phase)*1000
+                phase = time.perf_counter()
                 selection = owner.select(detections, frames, now, stereo=stereo, scrolling=engine.scrolling)
+                timings['selection_ms'] = (time.perf_counter()-phase)*1000
+                phase = time.perf_counter()
+                if not paired:
+                    owner.palm_since, owner.release_ready = None, False
                 hands = selection.hands or [None]*len(frames)
                 observation, reason = None, selection.reason
                 left = hands[0]
@@ -223,11 +238,20 @@ def run(args):
                 if observation is None and not owner.owner:
                     owner.candidate = owner.since = None
                     selection.progress = 0.
+                timings['observation_ms'] = (time.perf_counter()-phase)*1000
                 engine_now = time.monotonic()
-                if not engine.active and selection.key != previous_key:
-                    engine.step(None, engine_now)
-                previous_key = selection.key
+                if not engine.active and selection.key is not None and selection.key != previous_key:
+                    engine.reset_activation()
+                if selection.key is not None:
+                    previous_key = selection.key
+                engine_before = engine.diagnostics(engine_now)
+                phase = time.perf_counter()
                 events = engine.step(observation, engine_now)
+                timings['engine_ms'] = (time.perf_counter()-phase)*1000
+                if not engine.active and engine.activation_progress > 0:
+                    selection.progress = engine.activation_progress
+                    selection.reason = f'HOLD FIST: {engine.activation_dwell*(1-selection.progress):.1f}s'
+
                 if owner.owner and owner.release_ready and engine.active:
                     events += engine.stop('open palm')
                 for event in events:
@@ -238,6 +262,7 @@ def run(args):
                         previous_wrist = None
                         if event.value == 'open palm':
                             owner.release()
+                            selection.reason = 'HAND RELEASED - SHOW ONE FIST'
                         audio.play(False)
                     elif event.kind == "move" and desktop:
                         desktop.move(event.value)
@@ -251,21 +276,26 @@ def run(args):
                             desktop.scroll(event.value)
                 if owner.owner and owner.release_ready:
                     owner.release()
+                    selection.reason = 'HAND RELEASED - SHOW ONE FIST'
                     if not any(event.kind == 'deactivate' for event in events):
                         audio.play(False)
                 if observation is None:
                     selection.reason = reason
                 state = "inactive" if not engine.active else "active"
-                if observation is None:
+                if observation is None or engine.paused:
                     state = "unavailable"
                 elif engine.scrolling:
                     state = "scroll"
                 elif now < action_until:
                     state = "click"
                 if log:
+                    phase = time.perf_counter()
                     log.append(frames, hands, observation, engine, events, engine_now,
                                reason=reason, paired=paired, verified=verified, state=state,
-                               detections=detections, ownership=owner, selection=selection)
+                               detections=detections, ownership=owner, selection=selection,
+                               timings=timings, engine_before=engine_before)
+                    previous_log_ms = (time.perf_counter()-phase)*1000
+                phase = time.perf_counter()
                 color = COLORS[state]
                 if args.debug:
                     panel = debug_views(frames, hands, [args.left, args.right], color, detections)
@@ -298,7 +328,7 @@ def run(args):
                     cv2.putText(panel, line, (15, y), cv2.FONT_HERSHEY_SIMPLEX, .50 if args.debug else .58, (0, 0, 0), 4)
                     cv2.putText(panel, line, (15, y), cv2.FONT_HERSHEY_SIMPLEX, .50 if args.debug else .58, color, 1)
                 if args.debug:
-                    large_gesture(panel, selection, owner, engine, color, ready=paired and (not stereo or verified), available=observation is not None)
+                    large_gesture(panel, selection, owner, engine, color, ready=paired and (not stereo or verified), available=observation is not None and not engine.paused)
                 for i, (name, value) in enumerate(COLORS.items()):
                     cv2.putText(panel, name, (15+i*185, panel.shape[0]-18), cv2.FONT_HERSHEY_SIMPLEX, .5, value, 1)
                 # Small virtual screen shows motion even when using just one camera.
@@ -308,6 +338,7 @@ def run(args):
                     cv2.circle(panel, (cursor_x+round(engine.cursor[0]*215), cursor_y+round(engine.cursor[1]*135)), 5, color, -1)
                 cv2.imshow(window, panel)
                 key = cv2.waitKey(1) & 255
+                previous_render_ms = (time.perf_counter()-phase)*1000
                 if key in (27, ord('q')) or cv2.getWindowProperty(window, cv2.WND_PROP_VISIBLE) < 1:
                     return 0
                 count += 1
