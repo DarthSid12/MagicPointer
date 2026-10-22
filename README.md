@@ -151,6 +151,43 @@ include built-in or virtual cameras and can change after reconnecting devices.
 The feeds are labelled raw views, with pointer X mirroring controlled separately.
 Q, Escape, closing the window or Ctrl+C stops both streams and saves the archive.
 
+### Adaptive hand detection experiment
+
+For a two-camera debug trial when one view frequently misses a hand, add
+`--adaptive-detection`:
+
+```powershell
+python -m magicpointer run --debug --uncalibrated --left 2 --right 1 --fps 30 --adaptive-detection
+```
+
+Use your actual camera indices. Both regular detectors still run at the original
+0.65 detection/presence thresholds on every frame. When exactly one view returns
+any hands, the missing view can run a fresh full-image detector with 0.50 detection
+and presence thresholds, at most once per 0.25 seconds per view. This increases
+sensitivity by lowering the confidence cutoff. The other view supplies a presence
+cue, not a transferred pixel location or assumed gesture. Both views' returned
+landmarks must still pass the existing ownership, hand-shape, timing and, when
+calibrated, stereo geometry checks. A retry finding a hand does not guarantee the
+same hand or a correct gesture.
+
+This flag requires two-camera `--debug`; desktop control and ordinary debug are
+unchanged. Neither/both views detecting hands skips the retry. A view with raw
+detections but no matching owner is also outside this initial experiment. Retries
+use the current frame only; candidates are not carried across skipped frames.
+Input simulation can still pause between retries. No single-camera fallback is
+introduced. Lower thresholds may add false detections, and extra inference/model
+initialization can lower processing FPS. The on-screen ADAPTIVE TEST line shows
+retry status. No edge filter or image enhancement is applied; model input remains
+RGB converted from the captured image.
+
+Diagnostics preserve `baseline_hands` alongside the hands used for matching,
+mark each view's `detection_source`, and record retry decisions/candidate counts,
+configuration and added inference time. Summary counters distinguish attempts,
+frames with candidates and frames with an accepted observation; these are not
+accuracy scores. Record separate baseline and adaptive sessions with the same
+camera order, poses, lighting and distance. Archives remain data only: no images,
+video or audio. Live benefit at ten feet has not been established.
+
 ### Windows capture
 
 Windows uses **Media Foundation (MSMF)** for all camera commands, including

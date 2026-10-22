@@ -9,6 +9,17 @@ from test_tracking import hand
 
 
 class MultiTrackerTests(unittest.TestCase):
+    def test_image_mode_retries_fresh_inference_without_video_state(self):
+        tracker = Tracker.__new__(Tracker)
+        tracker.timestamp, tracker.image_mode = -1, True
+        tracker.mp, tracker.detector = MagicMock(), MagicMock()
+        tracker.detector.detect.return_value = SimpleNamespace(hand_landmarks=[], hand_world_landmarks=[], handedness=[])
+        image = np.zeros((480, 640, 3), np.uint8)
+        self.assertEqual(tracker.detect_all(image, 1.), [])
+        self.assertEqual(tracker.detect_all(image, 1.5), [])
+        self.assertEqual(tracker.detector.detect.call_count, 2)
+        tracker.detector.detect_for_video.assert_not_called()
+
     def test_all_model_hands_are_returned_with_corresponding_geometry_and_legacy_detect_remains_usable(self):
         tracker = Tracker.__new__(Tracker)
         tracker.timestamp = -1

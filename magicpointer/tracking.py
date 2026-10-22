@@ -78,17 +78,18 @@ class Hand:
 
 
 class Tracker:
-    def __init__(self, model, num_hands=1):
+    def __init__(self, model, num_hands=1, *, detection_confidence=.65, presence_confidence=.65, image_mode=False):
         import mediapipe as mp
         from .model import verify
         self.mp = mp
+        self.image_mode = image_mode
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(
             mp.tasks.vision.HandLandmarkerOptions(
                 base_options=mp.tasks.BaseOptions(model_asset_path=str(verify(model)),
                                                   delegate=mp.tasks.BaseOptions.Delegate.CPU),
-                running_mode=mp.tasks.vision.RunningMode.VIDEO,
-                num_hands=num_hands, min_hand_detection_confidence=.65,
-                min_hand_presence_confidence=.65, min_tracking_confidence=.65))
+                running_mode=mp.tasks.vision.RunningMode.IMAGE if image_mode else mp.tasks.vision.RunningMode.VIDEO,
+                num_hands=num_hands, min_hand_detection_confidence=detection_confidence,
+                min_hand_presence_confidence=presence_confidence, min_tracking_confidence=.65))
         self.timestamp = -1
 
     def detect_all(self, image, timestamp):
@@ -96,8 +97,11 @@ class Tracker:
         import numpy as np
         self.timestamp = max(self.timestamp + 1, int(timestamp * 1000))
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        result = self.detector.detect_for_video(
-            self.mp.Image(image_format=self.mp.ImageFormat.SRGB, data=rgb), self.timestamp)
+        frame = self.mp.Image(image_format=self.mp.ImageFormat.SRGB, data=rgb)
+        if getattr(self, 'image_mode', False):
+            result = self.detector.detect(frame)
+        else:
+            result = self.detector.detect_for_video(frame, self.timestamp)
         height, width = image.shape[:2]
         hands = []
         for landmarks, world_landmarks, categories in zip(result.hand_landmarks, result.hand_world_landmarks, result.handedness):

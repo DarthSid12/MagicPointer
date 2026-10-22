@@ -526,3 +526,42 @@ Windows and macOS CI passed for default-change commit `a63b0f2` in
 Both jobs passed dependency checks, the regression suite, CLI startup, official
 model download and real blank-frame four-hand tracker inference. Camera calls
 remain mocked in CI; the user's confirmation covers live app opening only.
+
+
+## Feature 13: debug-only adaptive detection; B14 swap evidence
+
+The supplied swapped archive records [2,1], both MSMF 1920x1080 / 30 FPS.
+Camera index 2 still has fewer samples with detections: 1,002/1,516 (66.09%)
+versus index 1 at 1,186/1,516 (78.23%). See reports/B14-camera-comparison.md.
+This supports a camera/view effect; no images distinguish focus, lighting,
+occlusion or device hardware. The two sessions are not identical labelled poses.
+
+User chose a debug-only experiment. --adaptive-detection requires two-camera
+--debug and remains opt-in. Both normal 0.65 detectors run every sampled pair.
+Exactly one nonempty regular view cues a missing-view IMAGE detector at 0.50
+palm-detection/presence thresholds, at most one attempt per 0.25 seconds per view.
+Lower-threshold candidates use the current image only. Existing hand ownership,
+shape/timing matching and calibrated geometry checks remain mandatory. No one-view
+input fallback, edge filtering or desktop-control adaptation is introduced.
+Missing selected-owner cases where another raw hand is present are not retried.
+
+Data-only logs retain baseline hands, effective hands and detection source,
+retry outcomes/configuration, added inference time and counters. Analyzer output
+separates baseline/effective availability and candidate/observation counts. None
+of these metrics establishes intended-hand or gesture accuracy. Additional model
+initialization/inference can reduce FPS; candidates may add false detections.
+
+Final local validation: 129 tests run, 128 passed and one Windows-only ABI check
+skipped. Tests cover symmetric missing-view retries on actual current-frame
+objects, cooldown without stale candidates, no retry for both/neither detections
+or bad timing, mismatched-hand rejection, failure cleanup, debug-only gating,
+synthetic full-app logging/analyzer integration and fresh IMAGE inference routing.
+Dependency check, CLI help and git diff --check passed. Real model VIDEO (0.65)
+and IMAGE (0.50) CPU blank-frame inference both passed. The initial sandboxed
+model smoke could not initialize macOS OpenGL; the same no-camera check passed
+outside the sandbox. CI now includes real IMAGE-mode model initialization/inference.
+No live camera trial, false-positive measurement or ten-foot benefit is claimed.
+
+Remote CI has not run for this experiment: automatic approval review requires
+explicit approval to publish the new feat/adaptive-debug-detection branch.
+Local validation above is complete; the branch is ready for publication.

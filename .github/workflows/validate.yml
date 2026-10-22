@@ -17,3 +17,4 @@ jobs:
       - run: python -m magicpointer --help
       - run: python -m magicpointer download-model
       - run: python -c "from magicpointer.tracking import Tracker; import numpy as np; t=Tracker('models/hand_landmarker.task',num_hands=4); assert t.detect(np.zeros((480,640,3),dtype=np.uint8),1.) is None; t.close()"
+      - run: python -c "from magicpointer.tracking import Tracker; import numpy as np; t=Tracker('models/hand_landmarker.task',num_hands=4,detection_confidence=.5,presence_confidence=.5,image_mode=True); assert t.detect(np.zeros((480,640,3),dtype=np.uint8),1.) is None; t.close()"

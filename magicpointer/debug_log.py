@@ -88,7 +88,7 @@ class DebugLog:
     def _write(self, name, value):
         (self.path/name).write_text(json.dumps(json_value(value), allow_nan=False, indent=2), encoding='utf-8')
 
-    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state, detections=None, ownership=None, selection=None, timings=None, engine_before=None):
+    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state, detections=None, ownership=None, selection=None, timings=None, engine_before=None, baseline_detections=None, adaptive_detection=None):
         sample = {'elapsed_seconds': now-self.started, 'monotonic_seconds': now,
                   'cameras': [{'grabbed_at': frame.grabbed_at,
                                'image_size': [frame.image.shape[1], frame.image.shape[0]],
@@ -130,6 +130,15 @@ class DebugLog:
                                    'palm_since': ownership.palm_since, 'release_ready': ownership.release_ready,
                                    'shape_disagreement': selection.spread,
                                    'combined_hand': hand_sample(selection.combined)}
+        if adaptive_detection is not None:
+            sample['adaptive_detection'] = adaptive_detection
+            self.counts['adaptive_attempts'] += adaptive_detection['attempted_view'] is not None
+            self.counts['adaptive_candidate_frames'] += adaptive_detection['candidate_count'] > 0
+            self.counts['adaptive_observation_frames'] += adaptive_detection['candidate_count'] > 0 and observation is not None
+        if baseline_detections is not None:
+            for index, baseline in enumerate(baseline_detections):
+                sample['cameras'][index]['baseline_hands'] = [hand_sample(hand) for hand in baseline]
+                sample['cameras'][index]['detection_source'] = adaptive_detection['detection_source'][index]
         self.stream.write(json.dumps(json_value(sample), allow_nan=False)+'\n')
         self.stream.flush()
         self.counts['frames'] += 1

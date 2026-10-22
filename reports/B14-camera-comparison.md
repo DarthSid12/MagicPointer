@@ -117,3 +117,36 @@ raw landmarks and replayed fusion in both orders as described above; all asserti
 passed. No desktop input, new model inference, camera acquisition or changes to
 recognition thresholds occurred. Full application tests were not rerun for this
 analysis/documentation-only change. B14 and B10 remain open.
+
+## Camera-order swap follow-up
+
+User supplied `debug-20261022T022911Z-4471e402.zip` after swapping the logical
+camera order without reporting a physical camera move. SHA-256:
+`84d04cb9220a28e6974e82f8bf8cc31f24018b008c1f23950161023129337d6a`.
+The archive records camera indices [2, 1], revision 8faceeb, both MSMF streams at
+1920x1080 / 30 reported FPS, and uncalibrated testing. Its 1,516 samples cover
+elapsed 7.266–122.937 seconds, about 13.10 processed pairs/sec.
+
+| Measure | Left: physical index 2 | Right: physical index 1 |
+| --- | ---: | ---: |
+| Samples with any raw hand | 1,002 / 1,516 (66.09%) | 1,186 / 1,516 (78.23%) |
+| Named gesture estimates / raw hand detections | 874 / 1,349 (64.79%) | 1,202 / 1,832 (65.61%) |
+| Samples with a named gesture | 859 / 1,516 (56.66%) | 1,016 / 1,516 (67.02%) |
+
+Both views detect hands in 883 samples; left-only 119, right-only 303 and neither
+211. Thus index 2 remains the weaker detector after becoming the primary/first
+view. This supports the camera/view hypothesis over an invariant right/second-slot
+problem. The sessions are not identical labelled stimuli, so this is evidence,
+not proof that capture order has no influence. Lighting, lens focus, viewpoint,
+occlusion and camera hardware are not distinguished by these archives.
+
+The swapped session also has many multi-hand detections. During its 941 owned
+samples, the selected owner is absent despite other detections in 127 left and
+116 right samples. Lowering detection thresholds only when a view has zero raw
+hands cannot address all owner-association failures. Pair timing rejects remain
+zero; this still does not prove synchronized camera exposures.
+
+ZIP CRC check passed. Independently counted raw availability and named gestures
+from samples.jsonl and cross-checked the existing analyzer. No image inference
+can be replayed from this data-only archive. Feature 13 records the user-approved
+debug-only adaptive reacquisition experiment; its live benefit is unvalidated.

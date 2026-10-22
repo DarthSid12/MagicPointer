@@ -74,7 +74,7 @@ def analyze(path):
                         'detected_hand_counts': dict(Counter(len(recorded_hands(row['cameras'][index])) for row in rows)),
                         'owner_missing_despite_other_detections': missing_despite_detection,
                         'raw_pose_estimates': dict(Counter(hand['gesture_estimate'] for row in rows for hand in recorded_hands(row['cameras'][index])))})
-    return {'source_sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'frames': len(rows),
+    result = {'source_sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'frames': len(rows),
             'duration_seconds': rows[-1]['elapsed_seconds'] if rows else 0.,
             'median_interval_ms': statistics.median(dt)*1000 if dt else None,
             'recorded_processing_fps': (len(dt)/(rows[-1]['monotonic_seconds']-rows[0]['monotonic_seconds'])) if dt else None,
@@ -84,6 +84,21 @@ def analyze(path):
             'shared_estimates': dict(Counter(row['selection']['combined_hand']['gesture_estimate'] if row.get('selection', {}).get('combined_hand') else 'unavailable' for row in rows)),
             'cameras': cameras, 'owned_control_replay': replay_owned(rows, metadata),
             'limitations': 'No images or intended-gesture labels. Detection counts and estimated poses are not accuracy measurements. No raw landmarks included in this summary.'}
+    if metadata.get('adaptive_detection', {}).get('enabled'):
+        attempts = [row for row in rows if row.get('adaptive_detection', {}).get('attempted_view') is not None]
+        candidate_rows = [row for row in attempts if row['adaptive_detection']['candidate_count'] > 0]
+        result['adaptive_detection'] = {
+            'configuration': metadata['adaptive_detection'],
+            'attempts': len(attempts), 'frames_with_candidates': len(candidate_rows),
+            'candidate_frames_with_observation': sum(row['observation'] is not None for row in candidate_rows),
+            'candidate_frame_statuses': dict(Counter(row['reason'] for row in candidate_rows)),
+            'per_camera': [{'index': camera_index,
+                'baseline_detected_frames': sum(bool(row['cameras'][i]['baseline_hands']) for row in rows),
+                'effective_detected_frames': sum(bool(recorded_hands(row['cameras'][i])) for row in rows),
+                'attempts': sum(row['adaptive_detection']['attempted_view'] == i for row in attempts)}
+                for i, camera_index in enumerate(metadata['camera_indices'])],
+            'note': 'Effective hands include lower-threshold candidates. Additional detections/observations do not establish correct hands or gestures.'}
+    return result
 
 
 def main():

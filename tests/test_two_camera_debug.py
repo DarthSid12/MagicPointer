@@ -19,7 +19,7 @@ from test_tracking import hand
 
 def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=False,
                  missing_right=False, capture_error=False, resolution=(1920, 1080), scene=None, frame_count=70, force_uncalibrated=False,
-                 capture_args=()):
+                 capture_args=(), recovery_scene=None):
     """Real app render/engine/archive path, synthetic cameras and stereo geometry."""
     geometry = rig()
     geometry['camera_indices'] = [0, 1]
@@ -30,6 +30,13 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
     camera.info = [{'index': i, 'width': resolution[0], 'height': resolution[1], 'reported_fps': 30} for i in (0, 1)]
     images = [np.full((resolution[1], resolution[0], 3), color, np.uint8) for color in ((70, 30, 20), (20, 70, 30))]
     index, clock, displays = [0], [1.], []
+    recovery_trackers = []
+
+    def recovery_tracker(*args, **kwargs):
+        tracker = MagicMock()
+        tracker.detect_all.side_effect = lambda image, timestamp: recovery_scene(index[0]) if recovery_scene else []
+        recovery_trackers.append(tracker)
+        return tracker
 
     def tick():
         clock[0] += .03
@@ -74,6 +81,7 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
                                    '--calibration', str(path), '--output', directory, '--mute', *capture_args])
         args.uncalibrated = force_uncalibrated
         with patch.object(app, 'Cameras', return_value=camera) as open_cameras, patch.object(app, 'Tracker', side_effect=trackers), \
+                patch('magicpointer.adaptive_detection.Tracker', side_effect=recovery_tracker), \
                 patch.object(app, 'Chimes', return_value=audio), patch.object(app.time, 'monotonic', side_effect=tick), \
                 patch.object(Stereo, 'check_markers', return_value=(marker_ok, 'Show wall markers')) as markers, \
                 patch.object(app.cv2, 'imshow', side_effect=lambda _, image: displays.__setitem__(slice(None), [image.copy()])), \
@@ -92,10 +100,50 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
         with zipfile.ZipFile(next(Path(directory).glob('debug-*.zip'))) as archive:
             metadata = json.loads(archive.read('session.json'))
             rows = [json.loads(line) for line in archive.read('samples.jsonl').splitlines()]
+            camera.recording_summary = json.loads(archive.read('summary.json'))
+        camera.recovery_trackers = recovery_trackers
+        if args.adaptive_detection:
+            from scripts.analyze_debug import analyze
+            camera.archive_analysis = analyze(next(Path(directory).glob('debug-*.zip')))
     return metadata, rows, displays, trackers, camera, audio, markers
 
 
 class TwoCameraDebugTests(unittest.TestCase):
+    def test_adaptive_resources_close_when_capture_stops(self):
+        metadata, _, _, _, camera, _, _ = dual_session(
+            'missing', missing_right=True, capture_error=True,
+            capture_args=('--adaptive-detection',))
+        self.assertEqual(metadata['termination'], 'ValueError')
+        self.assertEqual(len(camera.recovery_trackers), 1)
+        camera.recovery_trackers[0].close.assert_called_once()
+
+    def test_adaptive_recovery_is_logged_and_still_requires_a_matched_pair(self):
+        shape = np.asarray(hand(False, [0, 0, 0, 0]))
+        retry_hand = Hand(shape[:, :2]*1000+[320, 240], shape, 'Right', Gesture.FIST)
+        metadata, rows, _, _, camera, _, _ = dual_session(
+            'missing', frame_count=12, missing_right=True,
+            capture_args=('--adaptive-detection',), recovery_scene=lambda frame: [retry_hand])
+        self.assertTrue(metadata['adaptive_detection']['requires_both_views'])
+        retries = [row for row in rows if row['adaptive_detection']['attempted_view'] is not None]
+        self.assertGreater(len(retries), 0)
+        for row in rows:
+            self.assertTrue(row['cameras'][0]['baseline_hands'])
+            self.assertEqual(row['cameras'][1]['baseline_hands'], [])
+            self.assertIn('adaptive_detection_ms', row['timings_ms'])
+            if row in retries:
+                self.assertEqual(row['cameras'][1]['detection_source'], 'recovery')
+                self.assertIsNotNone(row['observation'])
+            else:
+                self.assertEqual(row['cameras'][1]['hands'], [])
+                self.assertIsNone(row['observation'])
+        self.assertEqual(camera.recording_summary['adaptive_attempts'], len(retries))
+        self.assertEqual(camera.recording_summary['adaptive_observation_frames'], len(retries))
+        self.assertEqual(camera.archive_analysis['adaptive_detection']['attempts'], len(retries))
+        self.assertEqual(camera.archive_analysis['adaptive_detection']['per_camera'][1]['baseline_detected_frames'], 0)
+        self.assertEqual(camera.archive_analysis['adaptive_detection']['per_camera'][1]['effective_detected_frames'], len(retries))
+        self.assertEqual(len(camera.recovery_trackers), 1)
+        camera.recovery_trackers[0].close.assert_called_once()
+
     def test_default_low_resolution_debug_routes_capture_options(self):
         metadata, rows, _, _, _, _, _ = dual_session(
             'missing', frame_count=2, resolution=(640, 480), force_uncalibrated=True,

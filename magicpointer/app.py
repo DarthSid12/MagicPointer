@@ -12,6 +12,7 @@ from .tracking import Tracker, distance, gesture_metrics
 from .tilt import measure, measure_wrist, direction_pitch
 from .fusion import combine
 from .ownership import HandOwner
+from .adaptive_detection import AdaptiveDetection
 
 COLORS = {"inactive": (150, 150, 150), "active": (70, 210, 70),
           "click": (220, 120, 240), "scroll": (240, 180, 30), "unavailable": (0, 160, 255)}
@@ -112,6 +113,8 @@ def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1., co
 
 
 def run(args):
+    if args.adaptive_detection and (not args.debug or args.right is None):
+        raise ValueError("Adaptive detection requires two-camera --debug; desktop control is unchanged")
     if args.uncalibrated and not args.debug:
         raise ValueError("Uncalibrated testing requires --debug; desktop control requires stereo calibration")
     if not args.debug and args.right is None:
@@ -136,7 +139,7 @@ def run(args):
     owner = HandOwner(2 if two_cameras else 1)
     previous_key = None
     trackers, audio, desktop = [], None, None
-    log = None
+    log, adaptive = None, None
     window = "MagicPointer - Q / Escape stops"
     mono_scale = 1.
     verified, verification_count = not two_cameras, 0
@@ -156,6 +159,14 @@ def run(args):
                            'activation_grace_seconds': engine.activation_grace,
                            'palm_release_policy': 'immediate two-view and fused agreement, otherwise 0.18s',
                            'termination': 'normal'})
+            if args.adaptive_detection:
+                log.metadata['adaptive_detection'] = {'enabled': True, 'version': 1,
+                    'regular_detection_confidence': .65, 'regular_presence_confidence': .65,
+                    'recovery_detection_confidence': AdaptiveDetection.confidence,
+                    'recovery_presence_confidence': AdaptiveDetection.confidence,
+                    'minimum_retry_interval_seconds': AdaptiveDetection.interval,
+                    'recovery_mode': 'IMAGE', 'requires_both_views': True}
+                adaptive = AdaptiveDetection(args.model, args.max_hands)
         # Verify model/dependencies before opening camera devices.
         trackers.append(Tracker(args.model, num_hands=args.max_hands))
         if two_cameras:
@@ -210,6 +221,11 @@ def run(args):
                     phase = time.perf_counter()
                     detections.append(tracker.detect_all(frame.image, frame.grabbed_at))
                     timings[f'detect_camera_{index}_ms'] = (time.perf_counter()-phase)*1000
+                baseline_detections, adaptive_trace = detections, None
+                if adaptive:
+                    phase = time.perf_counter()
+                    detections, adaptive_trace = adaptive.apply(detections, frames, now, paired=paired)
+                    timings['adaptive_detection_ms'] = (time.perf_counter()-phase)*1000
                 phase = time.perf_counter()
                 selection = owner.select(detections, frames, now, stereo=stereo, scrolling=engine.scrolling)
                 timings['selection_ms'] = (time.perf_counter()-phase)*1000
@@ -294,7 +310,9 @@ def run(args):
                     log.append(frames, hands, observation, engine, events, engine_now,
                                reason=reason, paired=paired, verified=verified, state=state,
                                detections=detections, ownership=owner, selection=selection,
-                               timings=timings, engine_before=engine_before)
+                               timings=timings, engine_before=engine_before,
+                               baseline_detections=baseline_detections if adaptive else None,
+                               adaptive_detection=adaptive_trace)
                     previous_log_ms = (time.perf_counter()-phase)*1000
                 phase = time.perf_counter()
                 color = COLORS[state]
@@ -324,6 +342,10 @@ def run(args):
                     lines.append(f"Pair grab skew: {skew:.1f} ms ({'OK' if paired else 'over 40 ms'}) | {depth}")
                 if log:
                     lines.append("REC: diagnostic data (auto-saved on exit)")
+                if adaptive_trace:
+                    view = adaptive_trace['attempted_view']
+                    attempt = '' if view is None else f" camera {[args.left, args.right][view]}"
+                    lines.append(f"ADAPTIVE TEST{attempt}: {adaptive_trace['reason']}")
                 for i, line in enumerate(lines):
                     y = 192+i*22 if args.debug else 27+i*26
                     cv2.putText(panel, line, (15, y), cv2.FONT_HERSHEY_SIMPLEX, .50 if args.debug else .58, (0, 0, 0), 4)
@@ -361,4 +383,6 @@ def run(args):
                 audio.close()
             for tracker in trackers:
                 tracker.close()
+            if adaptive:
+                adaptive.close()
             cv2.destroyAllWindows()
