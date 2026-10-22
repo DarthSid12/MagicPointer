@@ -1,0 +1,90 @@
+{
+  "source_sha256": "75660cea727233639b82ce051040c71da8ca3fbd245c1ca1e9585e9e388e335d",
+  "frames": 1086,
+  "duration_seconds": 142.34307816700002,
+  "median_interval_ms": 130.149583000005,
+  "recorded_processing_fps": 7.7546758849419435,
+  "pair_timing_rejected_frames": 105,
+  "status_counts": {
+    "Show one clear fist in all views; separate overlapping hands": 190,
+    "Camera pair timing mismatch": 105,
+    "Combined gesture; approximate image-space pointer": 614,
+    "OWNER PAUSED: Selected hand missing from a camera": 177
+  },
+  "owned_frames": 413,
+  "events": {
+    "activate": 5,
+    "move": 58,
+    "deactivate:tracking lost": 5
+  },
+  "shared_estimates": {
+    "unavailable": 390,
+    "unrecognized": 163,
+    "open palm": 75,
+    "fist": 342,
+    "point": 116
+  },
+  "cameras": [
+    {
+      "index": 0,
+      "detected_hand_counts": {
+        "0": 162,
+        "1": 692,
+        "2": 206,
+        "3": 26
+      },
+      "owner_missing_despite_other_detections": 132,
+      "raw_pose_estimates": {
+        "open palm": 291,
+        "unrecognized": 432,
+        "fist": 286,
+        "left click": 41,
+        "point": 127,
+        "scroll": 5
+      }
+    },
+    {
+      "index": 1,
+      "detected_hand_counts": {
+        "0": 169,
+        "1": 590,
+        "2": 325,
+        "3": 2
+      },
+      "owner_missing_despite_other_detections": 134,
+      "raw_pose_estimates": {
+        "open palm": 206,
+        "unrecognized": 466,
+        "fist": 427,
+        "point": 115,
+        "left click": 32
+      }
+    }
+  ],
+  "owned_control_replay": {
+    "first_recorded_activation_seconds": 69.847385375,
+    "frames": 574,
+    "activation_grace_unchanged": true,
+    "activation_grace_seconds": 0.0,
+    "policies": {
+      "legacy_deactivate": {
+        "events": {
+          "activate": 5,
+          "move": 58,
+          "deactivate:tracking lost": 5
+        },
+        "paused_frames": 0
+      },
+      "retain_owner_and_pause": {
+        "events": {
+          "activate": 4,
+          "move": 117,
+          "deactivate:open palm": 3
+        },
+        "paused_frames": 197
+      }
+    },
+    "note": "Same recorded selected-observation stream; no model inference, identity reassociation or OS input. This checks control logic, not gesture-intent accuracy."
+  },
+  "limitations": "No images or intended-gesture labels. Detection counts and estimated poses are not accuracy measurements. No raw landmarks included in this summary."
+}

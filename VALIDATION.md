@@ -384,3 +384,62 @@ lost its network connection; the final run/job API result independently confirme
 success for both jobs. No test rerun or code correction was needed. Live hand
 selection and fusion accuracy remain pending user testing; B8 stays open for that
 confirmation. Rollback foundation commit `60c9be8` was separately snapshot-tested.
+
+## B9 / B8 / 11.1: recorded reliability failures and advanced diagnostics
+
+The user reports both selection and gesture-action failures in
+`diagnostics/debug-20261021T234500Z-bd89e971.zip`. Analysis and reproducible aggregates
+are in reports/B9-reliability-analysis.md and reports/B9-debug-analysis.json. The
+1,086-frame, 142.34-second session runs about 7.75 processing FPS, rejects 105
+camera pairs, and records five activations followed by five tracking-loss stops.
+One missed frame can exceed the old 0.30-second loss timeout at that loop rate.
+A nearby owner handedness flip and blocked click estimates also appear; the data
+has no intended-gesture labels/images to establish true physical identity or
+recognition accuracy. Raw recordings and landmarks were not committed.
+
+Corrections keep activation with the selected owner through invalid/rejected
+views, immediately suppress input, and resume without fist rearming. Recovery
+clears click/scroll state, rebases pointing and reacquires scroll neutral. Initial
+selection preserves but does not credit valid fist evidence across unknown/missing
+gaps up to 0.4 seconds; known other gestures or identity changes reset it. Bound
+owner label flips are accepted only within 0.75 palm lengths with a soft penalty
+and unchanged uniqueness tests; unbound matching stays strict. The user confirmed
+immediate release when both raw camera estimates and fused result agree on a
+matched full palm; other palm evidence retains the 0.18-second confirmation.
+Rejected camera pairs cannot release the owner. The pair timing limit and no
+one-camera-fallback policy are unchanged.
+
+The isolated control replay seeds both policies at the same first activation and
+feeds identical recorded selected observations. Legacy reproduces every original
+event: 5 activations, 58 moves and 5 tracking-loss stops. Retained-owner control
+has no tracking-loss stops; recorded palm evidence produces 3 palm stops, with
+4 activations and 117 moves. Activation grace is disabled in both isolated replay
+policies. These are controller outputs, not intended-direction or gesture accuracy;
+identity reassociation and new palm-consensus selection are not replayed there.
+
+New data-only debug archives use schema 2: tracking history/cost/rejection and
+assignment traces, all pair candidates and ambiguity margins, per-finger/landmark
+disagreement, palm-release evidence, pre/post engine state, valid fist evidence,
+pause/rebase/latch state, image-space hand size, per-phase timings, and model,
+package/source fingerprints. Logging/render timings describe the preceding frame;
+summary reports median/p95/max durations and status counts. No images/video/audio,
+credentials or environment values are stored. The analyzer accepts schema 1/2.
+
+Final local validation: 114 tests run, 113 passed, one Windows ABI skip. New tests
+cover low-FPS one-frame gaps, long loss with held click chords, no-jump recovery,
+fresh scroll neutral, evidence grace/reset, nearby owner label flips without remote
+hand takeover, immediate two-view palm release, held single-view/uncertain release,
+no palm release on a rejected pair, and advanced archive/reporter fields. Existing
+hand-order, crossing, multi-camera fusion, legacy engine and diagnostics tests
+remain passing. The main synthetic paused panel was visually inspected. Whitespace
+checks passed. No new dependency or global classifier threshold changes were made.
+
+A bounded live macOS smoke opened both four-hand trackers/cameras, displayed 18
+frames and saved `diagnostics/debug-20261022T000107Z-690d7448.zip` normally. Its ZIP
+has only the three JSON files and contains new timing/decision fields, schema 2,
+source/model metadata and no images. This short startup had no hand detections;
+it does not validate live gestures. Illustrative no-hand phase medians: capture
+49.70 ms, camera inference 21.80/11.36 ms, preceding render 15.81 ms and preceding
+logging 0.11 ms. Those measurements are not a benchmark of the user's hand session.
+B9's forced-rearming control fault is fixed; B8 remains open for live owner/fusion
+confirmation. A new user session is needed before claiming broad reliability.

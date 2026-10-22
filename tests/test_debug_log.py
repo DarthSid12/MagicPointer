@@ -50,6 +50,30 @@ class DebugRecordingTests(unittest.TestCase):
         self.assertTrue(any(event['kind'] == 'scroll' for row in scrolling for event in row['events']))
         self.assertFalse(any(event['kind'] == 'click' for row in scrolling for event in row['events']))
 
+    def test_advanced_recording_preserves_matching_costs_engine_state_and_phase_timings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            debug_session(output=directory)
+            metadata, rows, summary = read_archive(directory)
+            self.assertEqual(metadata['schema_version'], 2)
+            self.assertEqual(metadata['diagnostics_version'], 2)
+            self.assertIn('model_sha256', metadata)
+            self.assertIn('dependencies', metadata)
+            self.assertTrue(all('engine_before' in row and 'engine_after' in row for row in rows))
+            self.assertTrue(all('detect_camera_0_ms' in row['timings_ms'] for row in rows))
+            self.assertTrue(any(row['tracking_decisions'][0]['costs'] for row in rows))
+            self.assertTrue(any(row['matching_decisions']['pairs'] for row in rows))
+            self.assertTrue(any(pair.get('finger_disagreement') for row in rows for pair in row['matching_decisions']['pairs']))
+            self.assertIn('frame_interval_ms', summary['timings_ms'])
+            self.assertIn('rejection_and_status_counts', summary)
+
+    def test_debug_analysis_accepts_new_schema_without_camera_or_os_input(self):
+        from scripts.analyze_debug import analyze
+        with tempfile.TemporaryDirectory() as directory:
+            debug_session(output=directory)
+            report = analyze(next(Path(directory).glob('debug-*.zip')))
+            self.assertGreater(report['frames'], 0)
+            self.assertIn('retain_owner_and_pause', report['owned_control_replay']['policies'])
+
     def test_data_is_flushed_and_both_camera_results_and_rejections_are_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
             log = DebugLog(directory, {'stereo': True})

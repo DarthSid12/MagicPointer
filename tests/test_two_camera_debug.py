@@ -37,7 +37,8 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
     def read():
         if capture_error and index[0] >= 2:
             raise ValueError('Camera stream stopped')
-        return [Frame(images[0], clock[0]), Frame(images[1], clock[0]+skew)]
+        current_skew = skew(index[0]) if callable(skew) else skew
+        return [Frame(images[0], clock[0]), Frame(images[1], clock[0]+current_skew)]
 
     def detect(side):
         def result(*_):
@@ -186,19 +187,18 @@ class TwoCameraDebugTests(unittest.TestCase):
         metadata, rows, panels, _, _, audio, _ = dual_session('missing', scene=scene, frame_count=230)
         activates = [(index, row) for index, row in enumerate(rows)
                      if any(event['kind'] == 'activate' for event in row['events'])]
-        self.assertEqual(len(activates), 3)
+        self.assertEqual(len(activates), 2)
         self.assertGreaterEqual(activates[0][0], 85)  # interrupted fists cannot accumulate
-        self.assertGreaterEqual(activates[1][0], 154)
-        self.assertGreaterEqual(activates[2][0], 218)
+        self.assertGreaterEqual(activates[1][0], 218)
         first_owner = activates[0][1]['selection']['owner_ids']
-        self.assertEqual(activates[1][1]['selection']['owner_ids'], first_owner)
-        self.assertNotEqual(activates[2][1]['selection']['owner_ids'], first_owner)
+        self.assertNotEqual(activates[1][1]['selection']['owner_ids'], first_owner)
         self.assertTrue(all(row['selection']['owner_ids'] == first_owner for row in rows[96:113]))
         self.assertTrue(all(row['observation'] is None for row in rows[106:113]))
-        self.assertTrue(any(event['value'] == 'tracking lost' for row in rows[106:113] for event in row['events']))
+        self.assertTrue(all(row['active'] and row['engine_after']['paused'] for row in rows[106:113]))
+        self.assertFalse(any(event['kind'] == 'deactivate' for row in rows[106:113] for event in row['events']))
         self.assertTrue(any(row['selection']['owner_ids'] is None for row in rows[167:177]))
         self.assertFalse(any(event['kind'] == 'click' for row in rows for event in row['events']))
-        self.assertEqual(sum(call.args == (True,) for call in audio.play.call_args_list), 3)
+        self.assertEqual(sum(call.args == (True,) for call in audio.play.call_args_list), 2)
         self.assertTrue(all('hands' in camera for row in rows for camera in row['cameras']))
         self.assertEqual(panels[-1].shape, (900, 1280, 3))
 
@@ -227,3 +227,17 @@ class TwoCameraDebugTests(unittest.TestCase):
                 app.run(args)
             load.assert_not_called()
             desktop.assert_not_called()
+
+
+    def test_rejected_pair_cannot_release_owner_even_with_both_palm_estimates(self):
+        from test_ownership_fusion import pose
+        def scene(frame, side):
+            return [pose(Gesture.FIST if frame < 55 else Gesture.PALM, 400.+side*80)]
+        _, rows, _, _, _, _, _ = dual_session('missing', scene=scene, frame_count=58,
+                                              skew=lambda frame: .08 if frame == 55 else .005)
+        self.assertTrue(rows[55]['active'])
+        self.assertIsNotNone(rows[55]['selection']['owner_ids'])
+        self.assertTrue(rows[55]['engine_after']['paused'])
+        self.assertFalse(rows[55]['events'])
+        self.assertIsNone(rows[56]['selection']['owner_ids'])
+        self.assertTrue(any(event['kind'] == 'deactivate' and event['value'] == 'open palm' for event in rows[56]['events']))

@@ -14,10 +14,17 @@ class LocalHands:
     def __init__(self):
         self.tracks = {}
         self.next_id = 1
+        self.labels = {}
+        self.diagnostics = {}
 
     def update(self, hands, now, size, keep=None):
         self.tracks = {key: value for key, value in self.tracks.items()
                        if now-value[3] <= 1. or key == keep}
+        self.labels = {key: self.labels[key] for key in self.tracks}
+        trace = {'owner_id': keep, 'tracks_before': [
+            {'id': key, 'wrist': value[1].tolist(), 'scale': value[2], 'last_seen': value[3], 'stable_label': self.labels[key]}
+            for key, value in self.tracks.items()], 'costs': [], 'assignments': [], 'ambiguous_tracks': []}
+        self.diagnostics = trace
         diagonal = math.hypot(*size)
         current = []
         for hand in hands:
@@ -27,10 +34,15 @@ class LocalHands:
         costs = {}
         for key, (old, wrist, scale, seen) in self.tracks.items():
             for index, (hand, position, length) in enumerate(current):
-                if old.label != hand.label:
-                    continue
-                cost = float(np.linalg.norm(position-wrist))/max(scale, length) + .3*abs(math.log(length/scale))
-                if cost <= 3.:
+                spatial = float(np.linalg.norm(position-wrist))/max(scale, length)
+                mismatch = self.labels[key] != hand.label
+                allowed_flip = key == keep and spatial <= .75
+                cost = spatial + .3*abs(math.log(length/scale)) + (.35 if mismatch else 0.)
+                rejected = 'handedness' if mismatch and not allowed_flip else ('distance' if cost > 3. else None)
+                trace['costs'].append({'track_id': key, 'detection': index, 'spatial_cost': spatial,
+                                       'total_cost': cost, 'label_mismatch': mismatch,
+                                       'allowed_owner_label_flip': allowed_flip and mismatch, 'rejected': rejected})
+                if rejected is None:
                     costs[key, index] = cost
         assigned = {}
         used = set()
@@ -41,18 +53,22 @@ class LocalHands:
             cost, index = choices[0]
             rivals = sorted((value, track) for (track, detection), value in costs.items() if detection == index)
             if rivals[0][1] != key or (len(choices) > 1 and choices[1][0]-cost < .5) or (len(rivals) > 1 and rivals[1][0]-cost < .5):
+                trace['ambiguous_tracks'].append(key)
                 continue
             assigned[key] = index
             used.add(index)
         for index in range(len(current)):
             if index not in used and not any(detection == index for _, detection in costs):
                 assigned[self.next_id] = index
+                self.labels[self.next_id] = current[index][0].label
                 self.next_id += 1
         visible = {}
         for key, index in assigned.items():
             hand, wrist, scale = current[index]
             self.tracks[key] = (hand, wrist, scale, now)
             visible[key] = hand
+            trace['assignments'].append({'track_id': key, 'detection': index})
+        trace['unassigned_detections'] = [index for index in range(len(current)) if index not in assigned.values()]
         return visible
 
 
@@ -74,6 +90,7 @@ class HandOwner:
         self.dwell = dwell
         self.palm_since = None
         self.release_ready = False
+        self.diagnostics = {}
 
     def release(self):
         self.owner = self.candidate = self.since = None
@@ -90,14 +107,18 @@ class HandOwner:
         self.visible = [tracker.update(hands, now, frame.image.shape[1::-1],
                                       self.owner[index] if self.owner else None)
                         for index, (tracker, hands, frame) in enumerate(zip(self.locals, detections, frames))]
+        self.diagnostics = {'timestamp': now, 'pairs': [], 'ambiguous_pair_margins': []}
         def result(key):
             hands = [view.get(track) for view, track in zip(self.visible, key)]
-            fused, reason, spread = combine(hands, ignore_thumb=scrolling)
+            details = {}
+            fused, reason, spread = combine(hands, ignore_thumb=scrolling, bound_pair=self.owner is not None, diagnostics=details)
             if fused is not None and stereo:
                 anchors = (0, 5, 9, 13, 17)
                 points = stereo.reconstruct(hands[0].pixels[list(anchors)], hands[1].pixels[list(anchors)])
                 if points is None:
                     fused, reason = None, 'Hands do not form a valid stereo pair'
+            self.diagnostics['pairs'].append({'ids': key, 'reason': reason, 'valid': fused is not None,
+                                               'gesture': fused.gesture if fused else None, **details})
             return Selection(key, hands, fused, reason, spread=spread)
         if self.owner:
             selected = result(self.owner)
@@ -106,7 +127,9 @@ class HandOwner:
             if selected.combined is not None and selected.combined.gesture == Gesture.PALM:
                 if self.palm_since is None:
                     self.palm_since = now
-                self.release_ready = now-self.palm_since >= .18
+                agreed_palm = len(selected.hands) == 2 and all(hand.gesture == Gesture.PALM for hand in selected.hands)
+                self.release_ready = agreed_palm or now-self.palm_since >= .18
+                self.diagnostics['palm_release_evidence'] = 'two_view_agreement' if agreed_palm else 'temporal_dwell'
             else:
                 self.palm_since, self.release_ready = None, False
             return selected
@@ -122,9 +145,12 @@ class HandOwner:
                     rivals = sorted(other.spread for other in candidates
                                     if other.key[camera] == item.key[camera] and other.key != item.key)
                     if rivals and rivals[0]-item.spread < .08:
+                        self.diagnostics['ambiguous_pair_margins'].append({'ids': item.key, 'camera': camera,
+                                                                          'margin': rivals[0]-item.spread, 'required': .08})
                         unique = False
                 if unique:
                     accepted.append(item)
+            self.diagnostics['accepted_pair_ids'] = [item.key for item in accepted]
             candidates = accepted
         fists = [item for item in candidates if item.combined.gesture == Gesture.FIST]
         if len(fists) != 1:

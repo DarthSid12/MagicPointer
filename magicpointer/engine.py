@@ -43,13 +43,20 @@ class Engine:
     """
 
     def __init__(self, width=0.40, height=0.25, mirror_x=True,
-                 dwell=0.18, activation_dwell=0.45, loss_timeout=0.30):
+                 dwell=0.18, activation_dwell=0.45, loss_timeout=0.30,
+                 retain_activation_on_loss=False, activation_grace=0.):
         values = (width, height, dwell, activation_dwell, loss_timeout)
         if not all(math.isfinite(v) and v > 0 for v in values):
             raise ValueError("Workspace sizes and timing thresholds must be positive and finite")
         self.width, self.height, self.mirror_x = width, height, mirror_x
         self.dwell, self.activation_dwell = dwell, activation_dwell
+        if not math.isfinite(activation_grace) or activation_grace < 0:
+            raise ValueError("Activation grace must be finite and nonnegative")
         self.loss_timeout = loss_timeout
+        self.retain_activation_on_loss = retain_activation_on_loss
+        self.activation_grace = activation_grace
+        self.paused = False
+        self.reset_activation()
         self.active = False
         self.origin = None
         self.cursor = (0.5, 0.5)
@@ -65,8 +72,37 @@ class Engine:
         self._rebase = False
         self._last_move = None
 
+    def reset_activation(self):
+        self._fist_seconds = 0.
+        self._last_fist = None
+        self._previous_fist = False
+
+    @property
+    def activation_progress(self):
+        return 1. if self.active else min(1., self._fist_seconds/self.activation_dwell)
+
+    def diagnostics(self, now):
+        return {'active': self.active, 'paused': self.paused,
+                'gesture_candidate': self._candidate, 'candidate_since': self._since,
+                'last_seen': self._last_seen,
+                'missing_seconds': None if self._last_seen is None else now-self._last_seen,
+                'fist_valid_seconds': self._fist_seconds, 'last_fist': self._last_fist,
+                'click_latched': self._action_latched, 'scrolling': self.scrolling,
+                'rebase_pending': self._rebase}
+
+    def _pause(self):
+        if not self.paused:
+            self._candidate = None
+            self._action_latched = True
+            self._rebase = True
+            self._last_move = self._exit_since = None
+            self.scroll.reset()
+        self.paused = True
+
     def stop(self, reason):
         self.active = False
+        self.paused = False
+        self.reset_activation()
         self.origin = None
         self._candidate = None
         self._action_latched = False
@@ -85,11 +121,43 @@ class Engine:
         self._last_time = now
         valid = observation is not None and all(
             math.isfinite(v) for point in (observation.wrist, observation.tip) for v in point)
-        # A long processing stall must not resume a previously armed click.
-        if self.active and self._last_seen is not None and now - self._last_seen > self.loss_timeout:
+        # A selected owner pauses through gaps; legacy stand-alone engines can
+        # still deactivate. Recovery never reuses a pending click or scroll rate.
+        if self.active and self.retain_activation_on_loss:
+            late = self._last_seen is not None and now-self._last_seen > self.loss_timeout
+            if not valid or late:
+                self._pause()
+                if valid:
+                    self._last_seen = now
+                return []
+            if self.paused:
+                self.paused = False
+        if self.active and self._last_seen is not None and now-self._last_seen > self.loss_timeout:
             events = self.stop("tracking lost")
             self._last_seen = now if valid else self._last_seen
             return events
+        if not self.active and self.activation_grace > 0:
+            gesture = observation.gesture if valid else Gesture.UNKNOWN
+            if gesture == Gesture.FIST:
+                if self._last_fist is None or now-self._last_fist > self.activation_grace:
+                    self.reset_activation()
+                if self._previous_fist:
+                    self._fist_seconds += dt
+                self._last_fist, self._previous_fist = now, True
+                if self._fist_seconds >= self.activation_dwell:
+                    self.active = True
+                    self.origin, self.cursor = observation.wrist, (.5, .5)
+                    self._last_seen = now
+                    self._candidate, self._since = gesture, now
+                    self._action_latched = False
+                    return [Event("activate"), Event("move", self.cursor)]
+            elif gesture == Gesture.UNKNOWN:
+                self._previous_fist = False
+                if self._last_fist is not None and now-self._last_fist > self.activation_grace:
+                    self.reset_activation()
+            else:
+                self.reset_activation()
+            return []
         if not valid:
             self._candidate = None
             self.scroll.update(None, now)
