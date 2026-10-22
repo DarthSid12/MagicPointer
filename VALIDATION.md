@@ -519,3 +519,10 @@ User authorized merging into main and updating branches. All other existing loca
 and remote feature/fix branches were already ancestors of this work; they contain
 no independent active changes to update. The B13 branch is to be retired after main
 is pushed, with historical branches/worktrees preserved.
+
+
+Windows and macOS CI passed for default-change commit `a63b0f2` in
+[run 39704393639](https://github.com/Himir-Desai/MagicPointer/actions/runs/39704393639).
+Both jobs passed dependency checks, the regression suite, CLI startup, official
+model download and real blank-frame four-hand tracker inference. Camera calls
+remain mocked in CI; the user's confirmation covers live app opening only.
