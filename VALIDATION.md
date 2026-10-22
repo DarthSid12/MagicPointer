@@ -463,3 +463,10 @@ marker history and the newer validation results. Integrated local regression sui
 114 tests run, 113 passed, one Windows ABI skip. Whitespace checks passed. No
 runtime behavior changed during integration. B10 is recorded as unmeasured and
 open; this checkpoint does not claim that far-distance detection works.
+
+Windows and macOS CI passed on main integration commit `d50562f` in
+[run 39698466522](https://github.com/Himir-Desai/MagicPointer/actions/runs/39698466522).
+Both jobs passed dependency checks, regression tests, CLI startup, model download
+and real blank-frame inference. Preliminary B10 analysis is recorded in
+reports/B10-distance-analysis.md using the exact archive confirmed by the user;
+no distance fix is included in the validated main checkpoint.
