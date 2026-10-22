@@ -27,28 +27,33 @@ def canonical(hand):
 def combine(hands, *, ignore_thumb=False, bound_pair=False, diagnostics=None):
     """Normalize each view, average geometry, then classify ONCE.
 
-    Labels are diagnostics, not votes. No camera gets to trigger input alone in
-    a two-camera session. Canonical coordinates are not metric stereo depth.
+    Labels are diagnostics, not votes. Missing/invalid views contribute no
+    geometry. Bound identities can disagree in shape: classify their combined
+    evidence instead of requiring two independent gesture estimates to agree.
+    Canonical coordinates are not metric stereo depth.
     """
-    if not hands or any(hand is None for hand in hands):
-        return None, 'Selected hand missing from a camera', None
+    evidence = [(index, hand, canonical(hand)) for index, hand in enumerate(hands or []) if hand is not None]
+    evidence = [(index, hand, points) for index, hand, points in evidence if points is not None]
+    if not evidence:
+        return None, 'No usable selected-hand geometry', None
+    indices_used, hands, points = zip(*evidence)
     if not bound_pair and len({hand.label for hand in hands}) != 1:
         return None, 'Handedness differs between views', None
-    points = [canonical(hand) for hand in hands]
-    if any(point is None for point in points):
-        return None, 'Invalid hand geometry', None
     indices = list(range(5, 21)) if ignore_thumb else list(range(21))
     spread = max(float(np.sqrt(np.mean(np.sum((point[indices]-points[0][indices])**2, axis=1)))) for point in points)
     if diagnostics is not None:
         residual = np.max([np.linalg.norm(point-points[0], axis=1) for point in points], axis=0)
         diagnostics.update(shape_spread=spread, spread_limit=.40,
+                           contributing_views=list(indices_used), evidence_views=len(points),
+                           fusion_method='equal mean of palm-aligned valid 3D geometry',
+                           confidence_note='view count and residual are evidence measures, not calibrated probabilities',
                            landmark_disagreement=residual.tolist(),
                            finger_disagreement={name: float(np.sqrt(np.mean(residual[start:start+4]**2)))
                                                 for name, start in zip(('thumb','index','middle','ring','little'), (1,5,9,13,17))},
                            handedness_agrees=len({hand.label for hand in hands}) == 1,
                            bound_pair=bound_pair)
-    if spread > .40:
+    if spread > .40 and not bound_pair:
         return None, 'Views disagree on hand shape', spread
     world = np.mean(points, axis=0)
     fused = Hand(hands[0].pixels, world, hands[0].label, classify(world))
-    return fused, 'Combined landmark geometry' if len(hands) > 1 else 'Hand geometry', spread
+    return fused, 'Combined landmark geometry' if len(hands) > 1 else 'Single-view hand geometry', spread

@@ -42,12 +42,24 @@ class FusionTests(unittest.TestCase):
         fused, _, _ = combine([left, right])
         self.assertTrue(fused is None or fused.gesture != Gesture.POINT)
 
-    def test_missing_different_handed_or_unusable_camera_never_falls_back(self):
+    def test_missing_or_invalid_view_contributes_no_geometry(self):
         left, right = pose(), pose(label='Left')
-        self.assertIsNone(combine([left, None])[0])
+        self.assertEqual(combine([left, None])[0].gesture, Gesture.FIST)
+        self.assertEqual(combine([None, left])[0].gesture, Gesture.FIST)
         self.assertIsNone(combine([left, right])[0])
         right.label, right.world = 'Right', []
-        self.assertIsNone(combine([left, right])[0])
+        self.assertEqual(combine([left, right])[0].gesture, Gesture.FIST)
+        self.assertIsNone(combine([None, right])[0])
+
+    def test_bound_views_combine_geometry_despite_disagreeing_pose_estimates(self):
+        from magicpointer.fusion import canonical
+        left, right = pose(Gesture.POINT), pose(Gesture.PALM)
+        details = {}
+        fused, _, spread = combine([left, right], bound_pair=True, diagnostics=details)
+        self.assertGreater(spread, .4)
+        np.testing.assert_allclose(fused.world, (canonical(left)+canonical(right))/2)
+        self.assertEqual(fused.gesture, classify(fused.world))
+        self.assertEqual(details['evidence_views'], 2)
 
 
 class OwnershipTests(unittest.TestCase):
@@ -105,12 +117,49 @@ class OwnershipTests(unittest.TestCase):
         self.owner.lock(selected.key)
         key = selected.key
         selected = self.step([pose(), pose(Gesture.PALM, 1200., 'Left')], [pose(Gesture.PALM, 1300., 'Left')])
-        self.assertIsNone(selected.combined)
+        self.assertEqual(selected.combined.gesture, Gesture.FIST)
+        self.assertIsNone(selected.hands[1])
         self.assertEqual(self.owner.owner, key)
         self.assertFalse(self.owner.release_ready)
         selected = self.step([pose()], [pose(x=600.)])
         self.assertEqual(selected.key, key)
         self.assertIsNotNone(selected.combined)
+
+    def test_single_view_selection_then_unique_second_view_binding(self):
+        selected = self.step([], [pose(x=600.)])
+        self.assertEqual(selected.combined.gesture, Gesture.FIST)
+        self.assertIsNone(selected.key[0])
+        self.owner.lock(selected.key)
+        selected = self.step([pose(label='Left')], [pose(x=600.)])
+        self.assertIsNone(selected.key[0])  # unrelated hand cannot supply perspective
+        selected = self.step([pose()], [pose(x=600.)])
+        self.assertTrue(all(track is not None for track in selected.key))
+        self.assertTrue(all(hand is not None for hand in selected.hands))
+
+    def test_no_takeover_when_only_unbound_view_sees_a_hand(self):
+        selected = self.step([pose()], [])
+        self.owner.lock(selected.key)
+        selected = self.step([], [pose(x=600.)])
+        self.assertIsNone(selected.combined)
+        self.assertIsNone(self.owner.owner[1])
+
+    def test_unrelated_opposite_view_does_not_block_single_view_fist_selection(self):
+        selected = self.step([pose()], [pose(Gesture.POINT, x=600., label='Left')])
+        self.assertEqual(selected.combined.gesture, Gesture.FIST)
+        self.assertIsNone(selected.key[1])
+
+    def test_calibrated_new_perspective_can_join_despite_shape_disagreement(self):
+        from magicpointer.stereo import Stereo
+        from test_geometry import rig, project
+        stereo = Stereo(rig())
+        left, right = pose(), pose(Gesture.PALM)
+        left.pixels, right.pixels = project(stereo, np.asarray(left.world)*.06+[0., 0., 2.])
+        selected = self.owner.select([[left], []], self.frames, 1., stereo=stereo)
+        self.owner.lock(selected.key)
+        selected = self.owner.select([[left], [right]], self.frames, 1.1, stereo=stereo)
+        self.assertTrue(all(track is not None for track in selected.key))
+        self.assertIsNotNone(selected.combined)
+        self.assertGreater(selected.spread, .4)
 
     def test_palm_release_is_available_even_if_engine_has_paused_for_tracking_loss(self):
         selected = self.step([pose()], [pose(x=600.)])

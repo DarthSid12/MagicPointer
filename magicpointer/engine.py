@@ -77,6 +77,12 @@ class Engine:
         self._last_fist = None
         self._previous_fist = False
 
+    def rebase_motion(self):
+        """Preserve the cursor when its coordinate source changes."""
+        self._rebase = True
+        self._last_move = None
+        self.scroll.reset()
+
     @property
     def activation_progress(self):
         return 1. if self.active else min(1., self._fist_seconds/self.activation_dwell)

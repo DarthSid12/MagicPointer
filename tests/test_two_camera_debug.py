@@ -19,7 +19,7 @@ from test_tracking import hand
 
 def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=False,
                  missing_right=False, capture_error=False, resolution=(1920, 1080), scene=None, frame_count=70, force_uncalibrated=False,
-                 capture_args=()):
+                 capture_args=(), desktop_control=False):
     """Real app render/engine/archive path, synthetic cameras and stereo geometry."""
     geometry = rig()
     geometry['camera_indices'] = [0, 1]
@@ -70,7 +70,7 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
         elif calibration == 'wrong_pair':
             geometry['camera_indices'] = [1, 0]
             path.write_text(json.dumps(geometry))
-        args = parser().parse_args(['run', '--debug', '--left', '0', '--right', '1',
+        args = parser().parse_args(['run', *([] if desktop_control else ['--debug']), '--left', '0', '--right', '1',
                                    '--calibration', str(path), '--output', directory, '--mute', *capture_args])
         args.uncalibrated = force_uncalibrated
         with patch.object(app, 'Cameras', return_value=camera) as open_cameras, patch.object(app, 'Tracker', side_effect=trackers), \
@@ -86,12 +86,19 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
                     assert 'stream stopped' in str(error)
             else:
                 assert app.run(args) == 0
-            desktop.assert_not_called()
+            if desktop_control:
+                desktop.assert_called_once()
+                desktop_commands = list(desktop.return_value.method_calls)
+            else:
+                desktop.assert_not_called()
             open_cameras.assert_called_once_with(0, 1, args.fps, backend=args.camera_backend,
                                                  width=args.capture_width, height=args.capture_height)
-        with zipfile.ZipFile(next(Path(directory).glob('debug-*.zip'))) as archive:
-            metadata = json.loads(archive.read('session.json'))
-            rows = [json.loads(line) for line in archive.read('samples.jsonl').splitlines()]
+        if desktop_control:
+            metadata, rows = {'desktop_commands': desktop_commands}, []
+        else:
+            with zipfile.ZipFile(next(Path(directory).glob('debug-*.zip'))) as archive:
+                metadata = json.loads(archive.read('session.json'))
+                rows = [json.loads(line) for line in archive.read('samples.jsonl').splitlines()]
     return metadata, rows, displays, trackers, camera, audio, markers
 
 
@@ -144,12 +151,45 @@ class TwoCameraDebugTests(unittest.TestCase):
         self.assertAlmostEqual(rows[-1]['observation']['wrist'][2], 2.)
 
     def test_calibrated_preview_keeps_both_feeds_when_markers_hand_or_pair_invalid(self):
-        for kwargs in ({'marker_ok': False}, {'skew': .08}, {'disagree': True}, {'missing_right': True}):
+        for kwargs in ({'marker_ok': False}, {'skew': .08}):
             with self.subTest(kwargs=kwargs):
                 _, rows, panels, _, _, _, _ = dual_session(**kwargs)
                 self.assertEqual(panels[-1].shape, (900, 1280, 3))
                 self.assertTrue(all(row['observation'] is None and not row['events'] for row in rows))
                 self.assertTrue(all(row['reason'] != 'Tracking' for row in rows))
+
+    def test_calibrated_associated_views_classify_combined_geometry_without_shape_veto(self):
+        _, rows, _, _, _, _, _ = dual_session(disagree=True, frame_count=5)
+        self.assertIsNotNone(rows[2]['observation'])
+        self.assertGreater(rows[2]['matching_decisions']['pairs'][0]['shape_spread'], .4)
+
+    def test_missing_view_supports_calibrated_approximate_control_and_activation(self):
+        _, rows, _, _, _, _, _ = dual_session(missing_right=True)
+        self.assertTrue(any(row['observation'] is not None for row in rows))
+        self.assertTrue(any(event['kind'] == 'activate' for row in rows for event in row['events']))
+        self.assertTrue(all(row['position_source'][0] == 'approximate'
+                            for row in rows if row['observation'] is not None))
+        self.assertTrue(all('no measured depth' in row['reason'] for row in rows if row['observation']))
+
+    def test_desktop_path_dispatches_approximate_motion_with_one_detecting_view(self):
+        metadata, _, _, _, _, _, _ = dual_session(missing_right=True, desktop_control=True)
+        self.assertTrue(any(call[0] == 'move' for call in metadata['desktop_commands']))
+
+    def test_calibrated_pointer_rebases_across_left_right_fallback_and_stereo_return(self):
+        from test_ownership_fusion import pose
+        stereo = Stereo(rig())
+        def scene(frame, side):
+            if (61 <= frame < 66 and side == 1) or (66 <= frame < 71 and side == 0):
+                return []
+            value = pose(Gesture.FIST if frame < 55 else Gesture.POINT)
+            value.pixels = project(stereo, np.asarray(value.world)*.06+[0., 0., 2.])[side]
+            return [value]
+        _, rows, _, _, _, _, _ = dual_session(scene=scene, frame_count=76)
+        for frame, source in ((61, ['approximate', 0]), (66, ['approximate', 1]), (71, ['stereo'])):
+            self.assertEqual(rows[frame]['position_source'], source)
+            np.testing.assert_allclose(rows[frame]['cursor'], rows[frame-1]['cursor'])
+            self.assertTrue(rows[frame]['active'])
+            self.assertFalse(rows[frame]['engine_after']['paused'])
 
     def test_wrong_resolution_falls_back_to_visible_preview_and_records_reason(self):
         metadata, rows, _, _, _, _, markers = dual_session(resolution=(640, 480))
@@ -204,8 +244,8 @@ class TwoCameraDebugTests(unittest.TestCase):
         first_owner = activates[0][1]['selection']['owner_ids']
         self.assertNotEqual(activates[1][1]['selection']['owner_ids'], first_owner)
         self.assertTrue(all(row['selection']['owner_ids'] == first_owner for row in rows[96:113]))
-        self.assertTrue(all(row['observation'] is None for row in rows[106:113]))
-        self.assertTrue(all(row['active'] and row['engine_after']['paused'] for row in rows[106:113]))
+        self.assertTrue(all(row['observation'] is not None for row in rows[106:113]))
+        self.assertTrue(all(row['active'] and not row['engine_after']['paused'] for row in rows[106:113]))
         self.assertFalse(any(event['kind'] == 'deactivate' for row in rows[106:113] for event in row['events']))
         self.assertTrue(any(row['selection']['owner_ids'] is None for row in rows[167:177]))
         self.assertFalse(any(event['kind'] == 'click' for row in rows for event in row['events']))
@@ -244,11 +284,11 @@ class TwoCameraDebugTests(unittest.TestCase):
         from test_ownership_fusion import pose
         def scene(frame, side):
             return [pose(Gesture.FIST if frame < 55 else Gesture.PALM, 400.+side*80)]
-        _, rows, _, _, _, _, _ = dual_session('missing', scene=scene, frame_count=58,
+        _, rows, _, _, _, _, _ = dual_session('missing', scene=scene, frame_count=62,
                                               skew=lambda frame: .08 if frame == 55 else .005)
         self.assertTrue(rows[55]['active'])
         self.assertIsNotNone(rows[55]['selection']['owner_ids'])
         self.assertTrue(rows[55]['engine_after']['paused'])
         self.assertFalse(rows[55]['events'])
-        self.assertIsNone(rows[56]['selection']['owner_ids'])
-        self.assertTrue(any(event['kind'] == 'deactivate' and event['value'] == 'open palm' for event in rows[56]['events']))
+        self.assertIsNotNone(rows[56]['selection']['owner_ids'])
+        self.assertTrue(any(event['kind'] == 'deactivate' and event['value'] == 'open palm' for row in rows[57:] for event in row['events']))

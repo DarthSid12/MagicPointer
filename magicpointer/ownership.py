@@ -6,7 +6,7 @@ import math
 import numpy as np
 
 from .engine import Gesture
-from .fusion import combine
+from .fusion import canonical, combine
 
 
 class LocalHands:
@@ -104,15 +104,45 @@ class HandOwner:
         self.release_ready = False
 
     def select(self, detections, frames, now, *, stereo=None, scrolling=False):
+        detections = [[hand for hand in hands if canonical(hand) is not None
+                       and np.asarray(hand.pixels).shape == (21, 2)
+                       and np.isfinite(hand.pixels).all()] for hands in detections]
         self.visible = [tracker.update(hands, now, frame.image.shape[1::-1],
                                       self.owner[index] if self.owner else None)
                         for index, (tracker, hands, frame) in enumerate(zip(self.locals, detections, frames))]
         self.diagnostics = {'timestamp': now, 'pairs': [], 'ambiguous_pair_margins': []}
+        # A hand first selected in one view has no identity in the other yet.
+        # Bind a new perspective only through a unique geometric association;
+        # never attach an arbitrary visible hand merely because a view returned.
+        if self.owner and None in self.owner:
+            key = list(self.owner)
+            known = next((i for i, track in enumerate(key)
+                          if track is not None and track in self.visible[i]), None)
+            if known is not None:
+                for index, track in enumerate(key):
+                    if track is not None:
+                        continue
+                    matches = []
+                    for candidate, hand in self.visible[index].items():
+                        pair = [self.visible[known][key[known]], hand]
+                        fused, _, spread = combine(pair, bound_pair=stereo is not None)
+                        if fused is not None:
+                            if stereo:
+                                ordered = pair if known == 0 else pair[::-1]
+                                anchors = [0, 5, 9, 13, 17]
+                                if stereo.reconstruct(ordered[0].pixels[anchors], ordered[1].pixels[anchors]) is None:
+                                    continue
+                            matches.append((spread, candidate))
+                    matches.sort()
+                    if matches and (len(matches) == 1 or matches[1][0]-matches[0][0] >= .08):
+                        key[index] = matches[0][1]
+            self.owner = tuple(key)
         def result(key):
             hands = [view.get(track) for view, track in zip(self.visible, key)]
             details = {}
-            fused, reason, spread = combine(hands, ignore_thumb=scrolling, bound_pair=self.owner is not None, diagnostics=details)
-            if fused is not None and stereo:
+            fused, reason, spread = combine(hands, ignore_thumb=scrolling,
+                                           bound_pair=self.owner is not None or stereo is not None, diagnostics=details)
+            if fused is not None and stereo and all(hand is not None for hand in hands) and self.owner is None:
                 anchors = (0, 5, 9, 13, 17)
                 points = stereo.reconstruct(hands[0].pixels[list(anchors)], hands[1].pixels[list(anchors)])
                 if points is None:
@@ -127,17 +157,17 @@ class HandOwner:
             if selected.combined is not None and selected.combined.gesture == Gesture.PALM:
                 if self.palm_since is None:
                     self.palm_since = now
-                agreed_palm = len(selected.hands) == 2 and all(hand.gesture == Gesture.PALM for hand in selected.hands)
-                self.release_ready = agreed_palm or now-self.palm_since >= .18
-                self.diagnostics['palm_release_evidence'] = 'two_view_agreement' if agreed_palm else 'temporal_dwell'
+                self.release_ready = now-self.palm_since >= .18
+                self.diagnostics['palm_release_evidence'] = 'fused_geometry_temporal_dwell'
             else:
                 self.palm_since, self.release_ready = None, False
             return selected
-        candidates = [result(key) for key in itertools.product(*(view.keys() for view in self.visible))]
+        candidates = [result(key) for key in itertools.product(*(view.keys() or [None] for view in self.visible))]
         candidates = [item for item in candidates if item.combined is not None]
+        paired_candidates = list(candidates)
         # Uncalibrated association needs a unique reciprocal shape match. Similar
         # same-handed hands cannot be disambiguated reliably; wait, never guess.
-        if len(self.locals) == 2:
+        if len(self.locals) == 2 and all(self.visible):
             accepted = []
             for item in candidates:
                 unique = True
@@ -152,6 +182,15 @@ class HandOwner:
                     accepted.append(item)
             self.diagnostics['accepted_pair_ids'] = [item.key for item in accepted]
             candidates = accepted
+            # An unrelated hand in the opposite view must not veto a uniquely
+            # selectable fist. Ambiguous valid pairings still cannot fall back.
+            for index, view in enumerate(self.visible):
+                for track in view:
+                    if not any(item.key[index] == track for item in paired_candidates):
+                        key = tuple(track if side == index else None for side in range(len(self.locals)))
+                        item = result(key)
+                        if item.combined is not None:
+                            candidates.append(item)
         fists = [item for item in candidates if item.combined.gesture == Gesture.FIST]
         if len(fists) != 1:
             self.candidate = self.since = None
@@ -161,7 +200,7 @@ class HandOwner:
                 item = candidates[0]
                 item.reason = 'Show a fist for 2.5 seconds to select this hand'
                 return item
-            return Selection(reason='Show one clear fist in all views; separate overlapping hands')
+            return Selection(reason='Show one clear fist in an available view; separate overlapping hands')
         item = fists[0]
         if item.key != self.candidate:
             self.candidate, self.since = item.key, now

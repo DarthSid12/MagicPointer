@@ -96,19 +96,22 @@ class BoundHandEvidenceTests(unittest.TestCase):
         self.owner.lock(selected.key)
         self.key=selected.key
 
-    def test_nearby_owner_label_flip_preserves_ids_and_fast_two_view_palm_releases(self):
+    def test_nearby_owner_label_flip_preserves_ids_and_fused_palm_dwell_releases(self):
         left,right=pose(Gesture.PALM),pose(Gesture.PALM,x=600.)
         right.label='Left'
         result=self.owner.select([[left],[right]],self.frames,1.13)
         self.assertEqual(result.key,self.key)
         self.assertEqual(result.combined.gesture,Gesture.PALM)
+        self.assertFalse(self.owner.release_ready)
+        self.owner.select([[left],[right]],self.frames,1.39)
         self.assertTrue(self.owner.release_ready)
-        self.assertEqual(self.owner.diagnostics['palm_release_evidence'],'two_view_agreement')
+        self.assertEqual(self.owner.diagnostics['palm_release_evidence'],'fused_geometry_temporal_dwell')
         self.assertTrue(any(cost['allowed_owner_label_flip'] for cost in self.owner.locals[1].diagnostics['costs']))
 
     def test_far_different_label_hand_cannot_replace_owner(self):
         result=self.owner.select([[pose()],[pose(x=1500.,label='Left')]],self.frames,1.13)
-        self.assertIsNone(result.combined)
+        self.assertEqual(result.combined.gesture, Gesture.FIST)
+        self.assertIsNone(result.hands[1])
         self.assertEqual(self.owner.owner,self.key)
         self.assertFalse(self.owner.release_ready)
 

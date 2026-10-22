@@ -9,8 +9,9 @@ from .engine import Engine, Gesture, Observation
 from .debug_log import DebugLog
 from .stereo import Stereo
 from .tracking import Tracker, distance, gesture_metrics
+from .approximate import ApproximateMotion
 from .tilt import measure, measure_wrist, direction_pitch
-from .fusion import combine
+from .fusion import canonical, combine
 from .ownership import HandOwner
 
 COLORS = {"inactive": (150, 150, 150), "active": (70, 210, 70),
@@ -84,7 +85,10 @@ def index_only(hand):
                                  ('index', 'middle', 'ring', 'little')] == [1, 0, 0, 0]
 
 
-def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1., combined=None):
+def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1., combined=None,
+            approximate=None, reference=None):
+    left = left if canonical(left) is not None else None
+    right = right if canonical(right) is not None else None
     hands = [left] if right is None else [left, right]
     if combined is None:
         combined, reason, _ = combine(hands, ignore_thumb=scrolling)
@@ -93,18 +97,30 @@ def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1., co
     pitch = None
     shape, _ = measure(combined, allow_thumb=True)
     if shape is not None:
-        directions = [direction_pitch(np.asarray(hand.world)[[5, 8, 9, 12]])[0] for hand in hands]
-        if all(value is not None for value in directions):
+        directions = [direction_pitch(np.asarray(hand.world)[[5, 8, 9, 12]])[0] for hand in hands if hand is not None]
+        if directions and all(value is not None for value in directions):
             pitch = float(np.mean(directions))
     if stereo is None:
-        points = left.pixels/mono_scale
+        available = left if left is not None else right
+        if available is None:
+            return None, 'No selected hand visible'
+        points = available.pixels/mono_scale
         return Observation(combined.gesture, (*points[0], 0.), (*points[8], 0.), pitch, index_only(combined)), 'Combined gesture; approximate image-space pointer'
-    if right is None:
-        return None, 'Selected hand missing from a camera'
     indices = [0]+list(range(5, 21)) if scrolling or combined.gesture == Gesture.SCROLL else list(range(21))
-    points = stereo.reconstruct(left.pixels[indices], right.pixels[indices])
-    if points is None or np.linalg.norm(points[0]) > 3.6576:
-        return None, 'Depth unreliable or beyond 12-foot target range'
+    points = stereo.reconstruct(left.pixels[indices], right.pixels[indices]) if left is not None and right is not None else None
+    if points is not None and np.linalg.norm(points[0]) > 3.6576:
+        return None, 'Measured hand position beyond 12-foot target range'
+    if points is None:
+        if approximate is None:
+            return None, 'Depth unreliable or selected view missing'
+        view = 0 if left is not None else 1
+        available = left if left is not None else right
+        if available is None:
+            return None, 'No selected hand visible'
+        mapped, _ = approximate.map(available, view, reference)
+        return Observation(combined.gesture, tuple(mapped[0]), tuple(mapped[8]), pitch, index_only(combined)), 'APPROXIMATE single-camera pointer; no measured depth'
+    if approximate is not None:
+        approximate.reset()
     indexed = dict(zip(indices, points))
     if shape is not None:
         pitch, _ = direction_pitch([indexed[i] for i in (5, 8, 9, 12)])
@@ -142,19 +158,23 @@ def run(args):
     verified, verification_count = not two_cameras, 0
     next_marker_check = 0.
     previous_wrist, previous_wrist_time = None, None
+    approximate = ApproximateMotion()
+    previous_source = None
     try:
         if args.debug:
             log = DebugLog(args.output, {'camera_indices': [args.left] + ([args.right] if two_cameras else []),
                            'requested_fps': args.fps, 'stereo': stereo is not None,
                            'preview_only': preview_only, 'calibration_issue': calibration_issue,
-                           'gesture_recognition': 'palm-aligned landmark fusion', 'fusion_version': 1,
+                           'gesture_recognition': 'available palm-aligned landmark fusion', 'fusion_version': 2,
+                           'missing_view_policy': 'recognize available geometry; approximate relative pointer',
+                           'approximate_pointer_units': 'relative control coordinates; 0.10 nominal metres per captured palm length, not measured depth',
                            'fused_landmarks_frame': 'normalized palm', 'max_hands_per_view': args.max_hands,
                            'workspace_width': engine.width, 'workspace_height': engine.height,
                            'mirror_x': engine.mirror_x, 'coordinate_units': 'metres' if stereo else 'activation_palm_sizes',
                            'dwell_seconds': engine.dwell, 'activation_dwell_seconds': engine.activation_dwell,
                            'loss_timeout_seconds': engine.loss_timeout, 'retain_activation_on_loss': True,
                            'activation_grace_seconds': engine.activation_grace,
-                           'palm_release_policy': 'immediate two-view and fused agreement, otherwise 0.18s',
+                           'palm_release_policy': 'fused geometry held for 0.18s; no per-view gesture votes',
                            'termination': 'normal'})
         # Verify model/dependencies before opening camera devices.
         trackers.append(Tracker(args.model, num_hands=args.max_hands))
@@ -219,18 +239,26 @@ def run(args):
                 hands = selection.hands or [None]*len(frames)
                 observation, reason = None, selection.reason
                 left = hands[0]
+                available = next((hand for hand in hands if hand is not None), None)
                 if stereo and not verified:
                     reason = marker_message
                 elif not paired:
                     reason = "Camera pair timing mismatch"
                 elif selection.combined is not None:
                     if stereo is None and not engine.active:
-                        mono_scale = max(10., float(np.linalg.norm(left.pixels[0]-left.pixels[9])))
+                        mono_scale = max(10., float(np.linalg.norm(available.pixels[0]-available.pixels[9])))
                     observation, reason = observe(left, hands[1] if two_cameras else None,
                                                   stereo=stereo, scrolling=engine.scrolling,
-                                                  mono_scale=mono_scale, combined=selection.combined)
+                                                  mono_scale=mono_scale, combined=selection.combined,
+                                                  approximate=approximate, reference=previous_wrist)
+                source = ('approximate', approximate.source) if approximate.source is not None and observation is not None else (
+                    ('stereo',) if stereo else ('image', next((i for i, hand in enumerate(hands) if hand is not None), None)))
+                source_changed = source != previous_source
+                if observation is not None and source_changed:
+                    engine.rebase_motion()
+                    previous_source = source
                 # Reject implausible same-label hand switches in metric stereo mode.
-                if observation is not None and stereo and engine.active and previous_wrist is not None:
+                if observation is not None and stereo and source == ('stereo',) and not source_changed and engine.active and previous_wrist is not None:
                     elapsed = now - previous_wrist_time
                     if elapsed > 0 and distance(observation.wrist, previous_wrist) / elapsed > 4.:
                         observation, reason = None, "Hand moved too abruptly; reacquire"
@@ -263,6 +291,8 @@ def run(args):
                         previous_wrist = None
                         if event.value == 'open palm':
                             owner.release()
+                            approximate.reset()
+                            previous_source = None
                             selection.reason = 'HAND RELEASED - SHOW ONE FIST'
                         audio.play(False)
                     elif event.kind == "move" and desktop:
@@ -294,7 +324,7 @@ def run(args):
                     log.append(frames, hands, observation, engine, events, engine_now,
                                reason=reason, paired=paired, verified=verified, state=state,
                                detections=detections, ownership=owner, selection=selection,
-                               timings=timings, engine_before=engine_before)
+                               timings=timings, engine_before=engine_before, position_source=source)
                     previous_log_ms = (time.perf_counter()-phase)*1000
                 phase = time.perf_counter()
                 color = COLORS[state]
@@ -309,7 +339,7 @@ def run(args):
                 lines = [title,
                          f"State: {state} | Shared gesture: {selection.combined.gesture.value if selection.combined else 'unavailable'}" +
                          (" (clicks ignored)" if engine.scrolling else ""),
-                         reason if observation is None else (last_action if now < action_until else "Tracking"),
+                         reason if observation is None or source[0] == 'approximate' else (last_action if now < action_until else "Tracking"),
                          f"Processing: {measured_fps:.1f} FPS | Q / Esc / close window to stop"]
                 if engine.scrolling:
                     scroll = engine.scroll
@@ -320,7 +350,7 @@ def run(args):
                     lines.append(feedback + " | Index-only exits")
                 if args.debug and two_cameras:
                     skew = abs(frames[0].grabbed_at-frames[1].grabbed_at)*1000
-                    depth = f"Wrist range: {np.linalg.norm(observation.wrist):.2f} m" if observation and stereo else "NO METRIC DEPTH - approximate pointer"
+                    depth = f"Wrist range: {np.linalg.norm(observation.wrist):.2f} m" if observation and stereo and source == ('stereo',) else "NO METRIC DEPTH - approximate pointer"
                     lines.append(f"Pair grab skew: {skew:.1f} ms ({'OK' if paired else 'over 40 ms'}) | {depth}")
                 if log:
                     lines.append("REC: diagnostic data (auto-saved on exit)")

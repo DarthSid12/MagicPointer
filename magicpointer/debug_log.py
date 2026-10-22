@@ -88,7 +88,7 @@ class DebugLog:
     def _write(self, name, value):
         (self.path/name).write_text(json.dumps(json_value(value), allow_nan=False, indent=2), encoding='utf-8')
 
-    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state, detections=None, ownership=None, selection=None, timings=None, engine_before=None):
+    def append(self, frames, hands, observation, engine, events, now, *, reason, paired, verified, state, detections=None, ownership=None, selection=None, timings=None, engine_before=None, position_source=None):
         sample = {'elapsed_seconds': now-self.started, 'monotonic_seconds': now,
                   'cameras': [{'grabbed_at': frame.grabbed_at,
                                'image_size': [frame.image.shape[1], frame.image.shape[0]],
@@ -96,6 +96,7 @@ class DebugLog:
                   'pair_grab_skew_ms': abs(frames[0].grabbed_at-frames[1].grabbed_at)*1000 if len(frames) == 2 else None,
                   'observation': asdict(observation) if observation else None,
                   'reason': reason, 'pair_timing_valid': paired, 'markers_verified': verified,
+                  'position_source': position_source,
                   'state': state, 'active': engine.active, 'scrolling': engine.scrolling,
                   'cursor': engine.cursor, 'origin': engine.origin,
                   'scroll': {'neutral_degrees': engine.scroll.neutral,

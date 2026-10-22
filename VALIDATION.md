@@ -526,3 +526,35 @@ Windows and macOS CI passed for default-change commit `a63b0f2` in
 Both jobs passed dependency checks, the regression suite, CLI startup, official
 model download and real blank-frame four-hand tracker inference. Camera calls
 remain mocked in CI; the user's confirmation covers live app opening only.
+
+
+## 12.2: Available-view geometry and approximate pointer continuation
+
+The user explicitly supersedes the earlier mandatory two-view/no-fallback policy
+and chooses approximate single-camera pointer continuation. The estimator already
+aligned/averaged landmarks; it now uses valid available geometry, classifies once,
+and records contributing views and residuals. Bound identities no longer require
+shape agreement or independent gesture labels. View count/residuals are evidence,
+not calibrated confidence probabilities. Fused palm geometry confirms release
+at 0.18 s; per-view palm labels no longer trigger immediate release.
+
+One-view fist selection is supported. An unbound perspective joins only through
+unique shape association (or calibrated geometry); another hand cannot take over
+when the known view disappears. Ambiguous identities still pause. Normal desktop
+control still requires valid calibration, both capture devices and verified wall
+markers. Pair timing and measured positions beyond the 12-foot target remain
+rejected. No input behavior has been physically confirmed on Windows.
+
+Without usable stereo position, a visible selected view supplies relative image
+motion at 0.10 nominal control metres per captured palm length, with no measured
+depth claim. Source changes rebase the existing cursor and reset scroll neutral.
+The preview and per-frame `position_source` distinguish this from stereo position.
+This mapping is approximate and does not solve distant-camera raw detection.
+
+Local regression validation covers aligned 3D fusion with misleading independent
+labels, bound shape disagreement, missing/invalid views, unique second-view joining,
+ambiguous/no-takeover cases, single-view activation, fused-palm dwell, real app
+render/engine/log paths, cursor continuity across stereo/left/right/stereo, and
+mocked desktop dispatch with one detecting view. Camera frames and OS adapters
+were synthetic/mocked; no real desktop input was sent. Live control/accuracy and
+Windows acceptance remain pending.

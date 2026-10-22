@@ -168,7 +168,7 @@ class ObservationTests(unittest.TestCase):
         right.pixels[:] = left.pixels
         self.assertIsNone(observe(left, right, stereo=stereo, scrolling=True)[0])
 
-    def test_both_views_must_support_two_finger_shape_and_palm_has_priority(self):
+    def test_invalid_view_is_excluded_and_its_gesture_label_cannot_override_geometry(self):
         stereo, left, right = self.pair()
         right.world = []
         obs, _ = observe(left, right, stereo=stereo, scrolling=True)
@@ -176,6 +176,9 @@ class ObservationTests(unittest.TestCase):
         right.gesture = Gesture.PALM
         obs, _ = observe(left, right, stereo=stereo, scrolling=True)
         self.assertIsNone(obs)
+        from magicpointer.approximate import ApproximateMotion
+        obs, _ = observe(left, right, stereo=stereo, scrolling=True, approximate=ApproximateMotion())
+        self.assertEqual(obs.gesture, Gesture.SCROLL)
 
     def test_mono_preview_uses_model_pitch_without_depth_claim(self):
         sample = camera_pose(-25.)

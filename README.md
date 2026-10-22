@@ -95,12 +95,12 @@ stereo depth or establish 12-foot accuracy. The main app detects up to four hand
 `8` changes that limit). Hold **one fist for 2.5 seconds** to choose the controlling
 hand and hear the activation chime. After selection, only that hand can control
 the virtual/real pointer; other hands are ignored for input. Open the selected
-hand's full palm to release it. A matched full palm agreed by both camera
-estimates and the shared result releases immediately; otherwise hold it briefly. The large debug banner shows the shared gesture,
+hand's full palm to release it. Hold the shared palm geometry for 0.18 seconds.
+The large debug banner shows the shared gesture,
 fist countdown, hand lock or paused state so it can be read from farther away.
 
 Detection list order never identifies the owner. Spatial continuity preserves
-local hand IDs; ambiguous crossings or missing selected views pause input instead
+local hand IDs; ambiguous crossings or loss of every selected view pause input instead
 of selecting a different hand. Tracking loss retains ownership, although input
 pauses immediately without discarding activation: return the same hand near its
 last tracked position to resume. Recovery does not fire a held click chord; point
@@ -138,11 +138,19 @@ Pair timing, hand association, depth validity and tracking-loss checks still app
 
 Each camera extracts landmarks for all detected hands. A matched pair is normalized
 into a common palm frame; its geometry is averaged and classified once. Independent
-per-view gesture labels are only diagnostic. Both views must support a confident
-match; there is no one-camera fallback during a two-camera session. Similar
+per-view gesture labels are only diagnostic. One usable view supplies a gesture;
+two associated views contribute their aligned geometry to that same decision.
+The selected hand can continue when one view loses it. Similar
 same-handed hands may be ambiguous without calibration: keep only one fist raised
 and separate overlapping hands. Calibrated mode additionally uses stereo geometry
-to validate pairing and supply metric position. The shared gesture estimator is
+to validate initial pairing and supply metric position. Without usable stereo
+position, the app continues approximate relative single-camera pointer movement,
+explicitly labelled with no measured depth. It rebases the cursor on source
+changes and resets scroll neutral to avoid carrying angles between perspectives.
+An unbound returning view joins only after a unique association with the selected
+hand; a different visible hand cannot take over. Bound views' shape disagreement
+is recorded, and their geometry is classified once without a gesture vote.
+The shared gesture estimator is
 landmark fusion, not an end-to-end trained multi-view neural network.
 
 Use `python -m magicpointer cameras --limit 4 --fps 30` to probe camera indices,
@@ -244,9 +252,10 @@ cannot reveal a moved rig, so keep them visible when possible.
 
 **Q, Escape, Ctrl+C, or closing the window stops the application.** An open palm
 also deactivates pointer control while keeping the application running. Camera
-failures end the app with a readable error. Missing/rejected views or a processing
-stall pause input while retaining the selected owner and activation. There is no
-one-camera fallback. Input resumes with the same confidently matched hand, with
+failures end the app with a readable error. Losing all selected views, an ambiguous
+identity, invalid pair timing or a processing stall pauses input while retaining
+the selected owner and activation. A single visible selected view continues
+gesture recognition and approximate movement. Input resumes with the same hand, with
 pending click/scroll state cleared and pointer position rebased.
 
 ## Gestures
@@ -258,7 +267,7 @@ pending click/scroll state cleared and pointer position rebased.
 | Index + thumb | One left click after 0.18 s of stable recognition |
 | Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |
 | Index + thumb + middle outside scrolling | One right click after 0.18 s of stable recognition |
-| Selected hand fully open | Stop input; two-view palm agreement releases immediately, otherwise confirm after 0.18 s; deactivation chime |
+| Selected hand fully open | Stop motion immediately; shared palm geometry held 0.18 s releases control; deactivation chime |
 
 Open the fingers for a click chord together: holding thumb-only long enough is a
 left click, even if you later add the middle finger. After a click, return to
