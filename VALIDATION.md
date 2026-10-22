@@ -425,7 +425,9 @@ package/source fingerprints. Logging/render timings describe the preceding frame
 summary reports median/p95/max durations and status counts. No images/video/audio,
 credentials or environment values are stored. The analyzer accepts schema 1/2.
 
-Final local validation: 114 tests run, 113 passed, one Windows ABI skip. New tests
+Final isolated fix-branch validation: 112 tests run, 111 passed, one Windows ABI
+skip. The earlier shared checkout also passed 114 tests, including two unrelated
+marker-styling tests; those marker changes are excluded from this fix branch. New tests
 cover low-FPS one-frame gaps, long loss with held click chords, no-jump recovery,
 fresh scroll neutral, evidence grace/reset, nearby owner label flips without remote
 hand takeover, immediate two-view palm release, held single-view/uncertain release,
@@ -443,3 +445,12 @@ it does not validate live gestures. Illustrative no-hand phase medians: capture
 logging 0.11 ms. Those measurements are not a benchmark of the user's hand session.
 B9's forced-rearming control fault is fixed; B8 remains open for live owner/fusion
 confirmation. A new user session is needed before claiming broad reliability.
+
+Windows and macOS CI passed for isolated fix commit `3832f8d` in
+[run 39697441435](https://github.com/Himir-Desai/MagicPointer/actions/runs/39697441435).
+Both jobs completed installation/dependency checks, the full regression suite,
+CLI startup, official model download and real four-hand blank-frame inference.
+The shared checkout switched externally to the printable-marker branch during
+development; its commits were preserved. The reliability-only commit was copied
+into an isolated worktree on `fix/ownership-reliability-diagnostics`, tested there
+and pushed without including the marker styling or rewriting either branch.
