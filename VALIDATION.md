@@ -562,6 +562,6 @@ model smoke could not initialize macOS OpenGL; the same no-camera check passed
 outside the sandbox. CI now includes real IMAGE-mode model initialization/inference.
 No live camera trial, false-positive measurement or ten-foot benefit is claimed.
 
-Remote CI has not run for this experiment: automatic approval review requires
-explicit approval to publish the new feat/adaptive-debug-detection branch.
-Local validation above is complete; the branch is ready for publication.
+User subsequently explicitly authorized publishing. Commit 34fdd7a was pushed
+to origin/feat/adaptive-debug-detection; CI run 39713215389 was in progress at
+publication. Local validation above is complete.
