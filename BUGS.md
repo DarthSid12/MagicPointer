@@ -18,4 +18,6 @@ Recording a bug does not authorize fixing it. Keep resolved entries for history.
 | B11 | Windows setup stops at the README's `py -3.11` command because `py` is not recognized. | 1 | No—local Python setup confirmation pending | README assumes the Windows Python launcher is available. Explained missing launcher/PATH possibilities and using `python -m venv .venv` when `python --version` reports a supported version (preferably 3.11). User's Windows installation has not been inspected or retested. |
 | B12 | Windows invocation reports unrecognized arguments for `--uncalibrated`. | 12 | No—exact command and installed source pending | Current CLI defines this option on `run`; it requires `--debug`. Provided the documented command and a `run --help` check to distinguish argument placement from older/different installed code. No runtime change; Windows reproduction pending. |
 
-Next bug number: **B13**.
+| B13 | Windows reports `Cannot open camera 2. Check its index and camera permissions.` | 2, 12 | No—command and camera-probe output pending | Error means capture could not open index 2; does not establish permission denial. Camera probe tries indices 0–3 by default and reports unavailable indices individually. Explained probe output versus run failure, selecting working indices, closing other camera apps and checking Windows desktop camera access. Windows hardware retest pending. |
+
+Next bug number: **B14**.
