@@ -1,48 +1,88 @@
-"""Model landmarks and rotation-invariant joint geometry classification."""
+"""Model landmarks and rotation-invariant hand-shape classification.
+
+Each digit is reduced to one scale-free extension ratio measured over long spans
+of the hand. Long spans tolerate per-landmark jitter far better than joint angles
+at short phalanges. Hysteresis keeps a borderline digit in its previous state
+instead of rejecting the whole pose.
+"""
 from dataclasses import dataclass
 import math
 
 from .engine import Gesture
+
+# (curl below, extend above) per digit: thumb, index, middle, ring, little.
+# Thumb: tip-to-middle-knuckle distance / palm length (wrist to middle knuckle).
+# Fingers: tip-to-wrist distance / knuckle-to-wrist distance.
+# Initial values from hand geometry; tune against recorded real-hand sessions.
+THRESHOLDS = ((.70, .85), (1.4, 1.6), (1.4, 1.6), (1.4, 1.6), (1.3, 1.5))
+
+SHAPES = {
+    (0, 0, 0, 0, 0): Gesture.FIST,
+    (0, 1, 0, 0, 0): Gesture.POINT,
+    (1, 1, 0, 0, 0): Gesture.LEFT,
+    (1, 1, 1, 0, 0): Gesture.RIGHT,
+    (0, 1, 1, 0, 0): Gesture.SCROLL,
+    (1, 1, 1, 1, 1): Gesture.PALM,
+}
 
 
 def distance(a, b):
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
 
-def angle(a, b, c):
-    ab = [x - y for x, y in zip(a, b)]
-    cb = [x - y for x, y in zip(c, b)]
-    denominator = math.sqrt(sum(v*v for v in ab) * sum(v*v for v in cb))
-    if denominator < 1e-10:
-        return 0.0
-    return math.degrees(math.acos(max(-1., min(1., sum(x*y for x, y in zip(ab, cb)) / denominator))))
+def extension(points):
+    """Return five extension ratios (thumb first), or None for unusable landmarks."""
+    if len(points) != 21 or not all(math.isfinite(v) for p in points for v in p):
+        return None
+    palm = distance(points[0], points[9])
+    if palm < 1e-6:
+        return None
+    ratios = [distance(points[4], points[9]) / palm]
+    for mcp in (5, 9, 13, 17):
+        base = distance(points[mcp], points[0])
+        if base < 1e-6:
+            return None
+        ratios.append(distance(points[mcp+3], points[0]) / base)
+    return tuple(ratios)
 
 
 def classify(points):
-    if len(points) != 21 or not all(math.isfinite(v) for p in points for v in p):
+    """Stateless single-frame classification at the middle of each threshold band."""
+    ratios = extension(points)
+    if ratios is None:
         return Gesture.UNKNOWN
-    palm = distance(points[0], points[9])
-    if palm < 1e-6:
-        return Gesture.UNKNOWN
-    fingers = []
-    for mcp in (5, 9, 13, 17):
-        straight = angle(points[mcp], points[mcp+1], points[mcp+2]) > 155
-        straight &= angle(points[mcp+1], points[mcp+2], points[mcp+3]) > 150
-        extended = straight and distance(points[mcp+3], points[0]) > distance(points[mcp], points[0]) * 1.25
-        curled = distance(points[mcp+3], points[0]) < distance(points[mcp+1], points[0]) * 1.05
-        fingers.append(1 if extended else (0 if curled else -1))
-    thumb_straight = angle(points[2], points[3], points[4]) > 150
-    separation = distance(points[4], points[5]) / palm
-    thumb = 1 if thumb_straight and separation > .65 else (0 if separation < .55 else -1)
-    signature = (thumb, *fingers)
-    return {
-        (0, 0, 0, 0, 0): Gesture.FIST,
-        (0, 1, 0, 0, 0): Gesture.POINT,
-        (1, 1, 0, 0, 0): Gesture.LEFT,
-        (1, 1, 1, 0, 0): Gesture.RIGHT,
-        (0, 1, 1, 0, 0): Gesture.SCROLL,
-        (1, 1, 1, 1, 1): Gesture.PALM,
-    }.get(signature, Gesture.UNKNOWN)
+    return SHAPES.get(tuple(int(r >= (lo + hi) / 2) for r, (lo, hi) in zip(ratios, THRESHOLDS)),
+                      Gesture.UNKNOWN)
+
+
+class Classifier:
+    """Per-hand temporal smoothing and per-digit hysteresis.
+
+    Ratios are low-passed over time, then each digit only changes state once it
+    clearly crosses the far side of its band. Stereo callers fuse both cameras'
+    ratios before calling update so one noisy view cannot veto the other.
+    """
+
+    def __init__(self, smoothing=.05, reset_after=.25):
+        if not all(math.isfinite(v) and v > 0 for v in (smoothing, reset_after)):
+            raise ValueError("Classifier timings must be positive and finite")
+        self.smoothing, self.reset_after = smoothing, reset_after
+        self._ratios = self._states = self._time = None
+
+    def update(self, ratios, now):
+        if ratios is None:
+            return Gesture.UNKNOWN
+        if self._time is None or not 0 <= now - self._time <= self.reset_after:
+            # A fresh or reacquired hand starts from the band midpoints.
+            self._ratios = tuple(ratios)
+            self._states = tuple(int(r >= (lo + hi) / 2) for r, (lo, hi) in zip(ratios, THRESHOLDS))
+        else:
+            alpha = 1 - math.exp(-(now - self._time) / self.smoothing)
+            self._ratios = tuple(a + alpha * (b - a) for a, b in zip(self._ratios, ratios))
+            self._states = tuple(1 if r > hi else 0 if r < lo else state
+                                 for r, (lo, hi), state in zip(self._ratios, THRESHOLDS, self._states))
+        self._time = now
+        return SHAPES.get(self._states, Gesture.UNKNOWN)
 
 
 @dataclass
@@ -51,6 +91,7 @@ class Hand:
     world: object
     label: str
     gesture: Gesture
+    ratios: object = None
 
 
 class Tracker:
@@ -79,7 +120,7 @@ class Tracker:
         height, width = image.shape[:2]
         pixels = np.array([(p.x * width, p.y * height) for p in result.hand_landmarks[0]])
         world = [(p.x, p.y, p.z) for p in result.hand_world_landmarks[0]]
-        return Hand(pixels, world, result.handedness[0][0].category_name, classify(world))
+        return Hand(pixels, world, result.handedness[0][0].category_name, classify(world), extension(world))
 
     def close(self):
         self.detector.close()

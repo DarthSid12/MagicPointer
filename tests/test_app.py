@@ -10,6 +10,10 @@ from magicpointer.cli import parser
 from magicpointer.engine import Gesture
 from magicpointer.tracking import Hand
 
+# Representative extension ratios (thumb, index, middle, ring, little) per pose.
+RATIOS = {Gesture.FIST: (.5, .8, .8, .8, .8), Gesture.POINT: (.5, 1.8, .8, .8, .8),
+          Gesture.LEFT: (1., 1.8, .8, .8, .8), Gesture.PALM: (1., 1.8, 1.9, 1.9, 1.7)}
+
 
 def debug_session():
     """Exercise actual render/engine/dispatch loop, with synthetic camera input."""
@@ -34,7 +38,8 @@ def debug_session():
         return [Frame(frame, now[0])]
 
     def detect(*_):
-        return Hand(pixels.copy(), [], 'Right', poses[min(index[0], len(poses)-1)])
+        pose = poses[min(index[0], len(poses)-1)]
+        return Hand(pixels.copy(), [], 'Right', pose, RATIOS[pose])
 
     def key(_):
         index[0] += 1

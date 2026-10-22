@@ -7,7 +7,7 @@ from .audio import Chimes
 from .cameras import Cameras
 from .engine import Engine, Gesture, Observation
 from .stereo import Stereo
-from .tracking import Tracker, distance
+from .tracking import Classifier, Tracker, distance
 
 COLORS = {"inactive": (150, 150, 150), "active": (70, 210, 70),
           "click": (220, 120, 240), "scroll": (240, 180, 30), "unavailable": (0, 160, 255)}
@@ -28,6 +28,16 @@ def draw_hand(image, hand, color):
         cv2.circle(image, tuple(point), 4, color, -1)
 
 
+def fuse(hands):
+    """Average per-camera extension ratios, weighting views where the palm appears larger."""
+    weighted = [(h.ratios, float(np.linalg.norm(h.pixels[0] - h.pixels[9])))
+                for h in hands if h is not None and h.ratios is not None]
+    total = sum(weight for _, weight in weighted)
+    if total <= 0:
+        return None
+    return tuple(sum(r[i] * weight for r, weight in weighted) / total for i in range(5))
+
+
 def run(args):
     if not args.debug and args.right is None:
         raise ValueError("Real pointer control needs two cameras. For one-camera preview use run --debug")
@@ -38,7 +48,8 @@ def run(args):
                     height=args.workspace_height * (10 if stereo is None else 1), mirror_x=args.mirror_x)
     trackers, audio, desktop = [], None, None
     window = "MagicPointer - Q / Escape stops"
-    current_label = None
+    classifier = Classifier()
+    current_label, label_mismatch_since = None, None
     mono_scale = 1.
     verified, verification_count = stereo is None, 0
     next_marker_check = 0.
@@ -72,7 +83,7 @@ def run(args):
                         raise ValueError(marker_message)
                     next_marker_check = now + 1.
                 hands = [tracker.detect(frame.image, frame.grabbed_at) for tracker, frame in zip(trackers, frames)]
-                observation, reason = None, "No reliable hand"
+                observation, reason, pose = None, "No reliable hand", None
                 left = hands[0]
                 if not verified:
                     reason = marker_message
@@ -81,21 +92,29 @@ def run(args):
                 elif left is not None:
                     if stereo:
                         right = hands[1]
-                        if right is not None and left.label == right.label and left.gesture == right.gesture:
-                            points = stereo.reconstruct(left.pixels, right.pixels)
+                        if right is not None:
+                            # Fused shape from both views; reprojection checks only the joints used.
+                            pose = classifier.update(fuse([left, right]), now)
+                            points = stereo.reconstruct(left.pixels[[0, 8]], right.pixels[[0, 8]], max_error=6.)
                             if points is not None and np.linalg.norm(points[0]) <= 3.6576:
-                                observation = Observation(left.gesture, tuple(points[0]), tuple(points[8]))
+                                observation = Observation(pose, tuple(points[0]), tuple(points[1]))
                             else:
                                 reason = "Depth unreliable or beyond 12-foot target range"
                         else:
-                            reason = "Hands/gestures disagree between cameras"
+                            reason = "Hand not visible to both cameras"
                     else:
+                        pose = classifier.update(fuse([left]), now)
                         if not engine.active:
                             mono_scale = max(10., float(np.linalg.norm(left.pixels[0]-left.pixels[9])))
                         points = left.pixels / mono_scale
-                        observation = Observation(left.gesture, (*points[0], 0.), (*points[8], 0.))
+                        observation = Observation(pose, (*points[0], 0.), (*points[8], 0.))
+                    # Handedness flickers, especially on fists; only a sustained change counts.
                     if engine.active and left.label != current_label:
-                        observation, reason = None, "Controlling hand changed"
+                        label_mismatch_since = now if label_mismatch_since is None else label_mismatch_since
+                        if now - label_mismatch_since > .2:
+                            observation, reason = None, "Controlling hand changed"
+                    else:
+                        label_mismatch_since = None
                 # Reject implausible same-label hand switches in metric stereo mode.
                 if observation is not None and stereo and engine.active and previous_wrist is not None:
                     elapsed = now - previous_wrist_time
@@ -106,7 +125,7 @@ def run(args):
                 events = engine.step(observation, time.monotonic())
                 for event in events:
                     if event.kind == "activate":
-                        current_label = left.label
+                        current_label, label_mismatch_since = left.label, None
                         audio.play(True)
                     elif event.kind == "deactivate":
                         current_label, previous_wrist = None, None
@@ -124,7 +143,7 @@ def run(args):
                 state = "inactive" if not engine.active else "active"
                 if observation is None:
                     state = "unavailable"
-                elif engine.active and left.gesture == Gesture.SCROLL:
+                elif engine.active and observation.gesture == Gesture.SCROLL:
                     state = "scroll"
                 elif now < action_until:
                     state = "click"
@@ -137,7 +156,7 @@ def run(args):
                     panel = np.full((540, 960, 3), (25, 25, 25), dtype=np.uint8)
                 # Primary-camera raw view is intentionally labelled: controls mirror X by default.
                 lines = ["DEBUG / NO DESKTOP INPUT" if args.debug else "STEREO / DESKTOP CONTROL",
-                         f"State: {state} | Gesture: {left.gesture.value if left else 'none'}",
+                         f"State: {state} | Gesture: {(pose or left.gesture).value if left else 'none'}",
                          reason if observation is None else (last_action if now < action_until else "Tracking"),
                          f"Processing: {measured_fps:.1f} FPS | Q / Esc / close window to stop"]
                 for i, line in enumerate(lines):

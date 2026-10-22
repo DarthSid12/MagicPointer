@@ -69,7 +69,10 @@ before committing a thumb-only left click or two-finger scroll. The exact timing
 thresholds need hands-on tuning and should be documented when implemented.
 
 Implemented initial timings: fist activation 0.45 s, gesture confirmation 0.18 s,
-tracking loss 0.30 s. Clicks latch until a stable index-only or fist pose; a right
+tracking loss 0.30 s, dropout grace 0.10 s, click position lookback 0.10 s.
+Each digit is classified from one long-span extension ratio with hysteresis;
+stereo fuses both cameras' ratios rather than requiring identical per-camera
+gestures. The pointer uses a One-Euro filter (1 Hz minimum cutoff, beta 10). Clicks latch until a stable index-only or fist pose; a right
 click cannot fall through into scrolling as its thumb closes. Chord fingers must
 be opened within the stabilization interval to avoid being accepted separately.
 Unknown/missing observations produce no OS input. Control is limited to the

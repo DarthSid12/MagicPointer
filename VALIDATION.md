@@ -83,3 +83,23 @@ Camera privacy settings and launcher restart instructions. A mocked macOS failur
 regression verifies this guidance and resource cleanup. Local regression run:
 34 tests, 33 passed, 1 Windows-only check skipped. No system permissions were
 changed; actual permission grant and successful capture require user action.
+
+## B2: Robust gesture recognition
+
+Synthetic anatomical hands with relaxed poses (slightly bent pointing fingers,
+loosely curled others) and Gaussian per-landmark jitter were compared against
+the previous classifier and engine. Each session holds fist, point, left, point,
+right, point, then palm, and succeeds with exactly one activation, one left and
+one right click, and one palm deactivation.
+
+| Landmark jitter | Previous (mono / stereo) | Revised (mono / stereo) |
+| --- | --- | --- |
+| 2 mm | 0% / 0% | 100% / 100% |
+| 4 mm | 0% / 0% | 100% / 100% |
+| 6 mm | 0% / 0% | 100% / 100% |
+
+The previous pipeline completed the session only without jitter. Per-frame
+recognition of relaxed poses at 4 mm rose from 0.1–61% to 93–100% for single
+frames and 100% with temporal smoothing. Local regression run (Python 3.11):
+44 tests, 43 passed, 1 Windows-only check skipped. Thresholds come from hand
+geometry and need tuning against recorded real-hand sessions on the rig.

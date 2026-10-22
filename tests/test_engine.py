@@ -101,9 +101,61 @@ class EngineTests(unittest.TestCase):
 
     def test_short_fist_and_interrupted_candidates_do_not_activate(self):
         self.hold(Gesture.FIST, .3)
-        self.sample(None)
+        self.hold(None, .15)
         self.hold(Gesture.FIST, .3)
         self.assertFalse(self.engine.active)
+        self.setUp()
+        self.hold(Gesture.FIST, .3)
+        self.hold(Gesture.POINT, .15)
+        self.hold(Gesture.FIST, .3)
+        self.assertFalse(self.engine.active)
+
+    def test_single_dropped_or_misread_frame_does_not_restart_activation(self):
+        for glitch in (None, Gesture.UNKNOWN, Gesture.POINT):
+            self.setUp()
+            self.hold(Gesture.FIST, .3)
+            self.sample(glitch)
+            events = self.hold(Gesture.FIST, .21)
+            with self.subTest(glitch=glitch):
+                self.assertEqual([e.kind for e in events], ['activate', 'move'])
+
+    def test_brief_misread_does_not_restart_or_repeat_click(self):
+        self.activate()
+        self.hold(Gesture.POINT, .3)
+        events = self.hold(Gesture.LEFT, .09)
+        events += self.sample(Gesture.UNKNOWN) + self.sample(Gesture.POINT)
+        events += self.hold(Gesture.LEFT, .12)
+        self.assertEqual([e.value for e in events if e.kind == 'click'], ['left'])
+
+    def test_sustained_unrecognized_pose_still_suppresses_actions(self):
+        self.activate()
+        self.hold(Gesture.POINT, .3)
+        self.hold(Gesture.LEFT, .09)
+        events = self.hold(Gesture.UNKNOWN, .3)
+        self.assertFalse(any(e.kind == 'click' for e in events))
+        self.assertTrue(self.engine.active)
+
+    def test_click_lands_where_pointer_was_before_thumb_opened(self):
+        self.activate()
+        settled = self.hold(Gesture.POINT, .3, tip=(.05, 0., 2.))[-1].value
+        # Opening the thumb drags the index tip before the pose is recognized.
+        self.hold(Gesture.POINT, .06, tip=(.09, 0., 2.))
+        events = self.hold(Gesture.LEFT, .3, tip=(.12, 0., 2.))
+        kinds = [e.kind for e in events]
+        self.assertEqual(kinds, ['move', 'click'])
+        self.assertEqual(events[0].value, settled)
+        self.assertEqual(self.engine.cursor, settled)
+
+    def test_pointer_filter_suppresses_jitter_but_follows_motion(self):
+        self.activate()
+        self.hold(Gesture.POINT, .3)
+        positions = []
+        for i in range(60):
+            positions.append(self.sample(Gesture.POINT, tip=(.005 * (-1) ** i, 0., 2.))[-1].value[0])
+        self.assertLess(max(abs(x - .5) for x in positions[20:]), .005)
+        self.hold(Gesture.POINT, .5, tip=(.1, .05, 2.))
+        self.assertAlmostEqual(self.engine.cursor[0], .75, delta=.01)
+        self.assertAlmostEqual(self.engine.cursor[1], .7, delta=.01)
 
     def test_nonfinite_observation_is_tracking_loss(self):
         self.activate()
@@ -114,6 +166,8 @@ class EngineTests(unittest.TestCase):
         for width in (0, -1, float('nan')):
             with self.assertRaises(ValueError):
                 Engine(width=width)
+        with self.assertRaises(ValueError):
+            Engine(grace=0)
         self.sample(None)
         with self.assertRaises(ValueError):
             self.engine.step(None, 0.)

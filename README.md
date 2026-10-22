@@ -68,7 +68,9 @@ Keep other hands out of view while controlling the pointer.
 ## Prepare and calibrate the fixed stereo rig
 
 Place both 1080p cameras near the TV with overlapping views and a rigid mount.
-Use separate camera indices. Do not move either camera, change its lens/zoom, or
+Mount them above or beside the screen, angled so a pointing finger is not aimed
+straight into either lens: the hand model distinguishes extended from curled
+fingers poorly when a finger points directly at a camera. Use separate camera indices. Do not move either camera, change its lens/zoom, or
 change capture geometry after calibration. Generic USB cameras use software-paired
 frames; they are not hardware synchronized. Fast hand motion can reduce accuracy.
 
@@ -123,7 +125,8 @@ cannot reveal a moved rig, so keep them visible when possible.
 also deactivates pointer control while keeping the application running. Camera
 failures end the app with a readable error; tracking loss stops input immediately
 and deactivates after 0.30 s. A processing stall over that threshold also requires
-reactivation.
+reactivation. Dropouts or misread frames up to 0.10 s are bridged, so a single
+noisy frame does not restart a hold timer.
 
 ## Gestures
 
@@ -131,7 +134,7 @@ reactivation.
 | --- | --- |
 | Closed fist anywhere in the shared view, held 0.45 s | Activation chime; fist wrist becomes origin; cursor centers on primary display |
 | Index extended, other fingers curled | Index tip controls pointer relative to origin |
-| Index + thumb | One left click after 0.18 s of stable recognition |
+| Index + thumb | One left click after 0.18 s of stable recognition, at the pointer position from just before the thumb opened |
 | Index + middle | Vertical two-finger movement scrolls after stabilization |
 | Index + thumb + middle | One right click after 0.18 s of stable recognition |
 | Entire palm open | Stop input immediately; confirm deactivation after 0.18 s with a different chime |
@@ -139,7 +142,8 @@ reactivation.
 Open the fingers for a click chord together: holding thumb-only long enough is a
 left click, even if you later add the middle finger. After a click, return to
 index-only or a fist for 0.18 s before another click or scroll. Holding a click
-pose does not repeat clicks. Unrecognized poses produce no pointer actions.
+pose does not repeat clicks. The pointer holds still while a click pose is held.
+Unrecognized poses produce no pointer actions.
 
 The interaction plane is parallel to the camera image plane, centered at the
 activation fist. Both whole-hand motion and index-tip motion affect it. A default
@@ -164,7 +168,7 @@ Run `python -m magicpointer run --help` for details.
 The requested 12-foot range (3.6576 m) is a validation target, not a measured
 claim. Real control rejects wrists beyond that measured range. Resolution,
 lighting, exposure, camera spacing, occlusion and model quality affect results.
-Joint-angle classification is rotation invariant in landmark coordinates, but
+Hand-shape classification is rotation invariant in landmark coordinates, but
 real landmark estimation is not guaranteed at every orientation. Fingers hidden
 from both cameras cannot be reliably observed.
 
