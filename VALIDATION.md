@@ -494,3 +494,28 @@ rejected settings/platform combinations, release on second-open failure, camera
 probe routing and the full synthetic low-resolution debug path. Windows capture
 calls are mocked locally. Full Windows debug preview, physical feed identity,
 long-running simultaneous capture and higher-resolution behavior need live retest.
+
+
+## B13 Windows default and startup confirmation
+
+User confirms that the full debug app now opens with MSMF on Windows, explicitly
+without claiming correct gestures, pointing, scrolling, tracking or other runtime
+quality. B13's opening failure is fixed; broader feature acceptance remains pending.
+
+MSMF is now the default for every Windows Cameras caller, including one-/two-camera
+run, calibration, camera probing and the diagnostic/tilt tools. Removed DirectShow
+selection and its format setup on Windows. Explicit --camera-backend msmf commands
+remain valid. macOS uses the same system backend and format setup as before.
+Resolution defaults remain 1920x1080; README's user-confirmed startup command requests
+640x480/30 FPS without a backend flag. No 1080p Windows claim is made.
+
+Final local validation: 120 tests run, 119 passed, one Windows ABI skip. The default
+Windows pair test verifies both captures use MSMF without forcing MJPG, reads both
+streams and releases both. Default second-open failure cleanup and low-resolution
+debug/probe routing pass; removed dshow settings are rejected. macOS capture remains
+covered. pip check, all three capture-command help checks and git diff --check pass.
+
+User authorized merging into main and updating branches. All other existing local
+and remote feature/fix branches were already ancestors of this work; they contain
+no independent active changes to update. The B13 branch is to be retired after main
+is pushed, with historical branches/worktrees preserved.

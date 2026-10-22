@@ -36,8 +36,8 @@ def pixels(value):
 
 
 def capture_options(cmd):
-    cmd.add_argument("--camera-backend", choices=("default", "dshow", "msmf"), default="default",
-                     help="capture API: default uses DirectShow on Windows; dshow/msmf require Windows")
+    cmd.add_argument("--camera-backend", choices=("default", "msmf"), default="default",
+                     help="default uses Media Foundation on Windows and the system backend elsewhere; msmf requires Windows")
     cmd.add_argument("--capture-width", type=pixels, default=1920, help="requested camera width in pixels (default: 1920)")
     cmd.add_argument("--capture-height", type=pixels, default=1080, help="requested camera height in pixels (default: 1080)")
 

@@ -96,10 +96,10 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
 
 
 class TwoCameraDebugTests(unittest.TestCase):
-    def test_msmf_low_resolution_debug_routes_capture_options(self):
+    def test_default_low_resolution_debug_routes_capture_options(self):
         metadata, rows, _, _, _, _, _ = dual_session(
             'missing', frame_count=2, resolution=(640, 480), force_uncalibrated=True,
-            capture_args=('--camera-backend', 'msmf', '--capture-width', '640', '--capture-height', '480', '--fps', '30'))
+            capture_args=('--capture-width', '640', '--capture-height', '480', '--fps', '30'))
         self.assertTrue(metadata['preview_only'])
         self.assertEqual(metadata['cameras'][0]['width'], 640)
         self.assertEqual(len(rows), 2)

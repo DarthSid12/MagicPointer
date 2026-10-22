@@ -17,13 +17,13 @@ class Cameras:
             raise ValueError("Camera indices must be nonnegative and different")
         if width <= 0 or height <= 0:
             raise ValueError("Capture width and height must be positive")
-        if backend not in ("default", "dshow", "msmf"):
-            raise ValueError("Camera backend must be default, dshow or msmf")
+        if backend not in ("default", "msmf"):
+            raise ValueError("Camera backend must be default or msmf")
         system = platform.system()
         if backend != "default" and system != "Windows":
-            raise ValueError("DirectShow and Media Foundation camera backends require Windows")
-        backend_name = ("dshow" if system == "Windows" else "system") if backend == "default" else backend
-        api = {"dshow": cv2.CAP_DSHOW, "msmf": cv2.CAP_MSMF, "system": cv2.CAP_ANY}[backend_name]
+            raise ValueError("The Media Foundation camera backend requires Windows")
+        backend_name = "msmf" if system == "Windows" else "system"
+        api = cv2.CAP_MSMF if system == "Windows" else cv2.CAP_ANY
         self.cv = cv2
         self.captures = []
         self.info = []
@@ -45,8 +45,8 @@ class Cameras:
                         message += "Check its index and camera permissions."
                         if system == "Windows" and len(self.captures) > 1:
                             message += (f" Backend: {backend_name}; earlier camera is already open. "
-                                        "If both work individually, test the other --camera-backend "
-                                        "(dshow/msmf) and lower --capture-width/--capture-height at --fps 30.")
+                                        "If both work individually, try lower --capture-width/--capture-height "
+                                        "at --fps 30 and check shared USB resources or camera drivers.")
                     raise ValueError(message)
                 # Let Media Foundation negotiate its format, matching the working B13 diagnostic.
                 if backend_name != "msmf":

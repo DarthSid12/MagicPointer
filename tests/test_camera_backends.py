@@ -22,7 +22,7 @@ def capture():
 
 class CameraBackendTests(unittest.TestCase):
     def test_pair_uses_one_selected_backend_and_releases_both(self):
-        for choice, api in (('default', cv2.CAP_DSHOW), ('dshow', cv2.CAP_DSHOW), ('msmf', cv2.CAP_MSMF)):
+        for choice, api in (('default', cv2.CAP_MSMF), ('msmf', cv2.CAP_MSMF)):
             with self.subTest(backend=choice):
                 one, two = capture(), capture()
                 with patch('magicpointer.cameras.platform.system', return_value='Windows'), \
@@ -30,7 +30,7 @@ class CameraBackendTests(unittest.TestCase):
                     with Cameras(1, 2, '30', width=640, height=480, backend=choice) as cameras:
                         self.assertEqual(len(cameras.read()), 2)
                         self.assertEqual([item['backend'] for item in cameras.info],
-                                         [choice if choice != 'default' else 'dshow'] * 2)
+                                         ['msmf'] * 2)
                         self.assertEqual(cameras.info[0]['width'], 640)
                     self.assertEqual(opened.call_args_list, [call(1, api), call(2, api)])
                 for cap in (one, two):
@@ -38,7 +38,7 @@ class CameraBackendTests(unittest.TestCase):
                     cap.set.assert_any_call(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     cap.set.assert_any_call(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                     fourcc_calls = [item for item in cap.set.call_args_list if item.args[0] == cv2.CAP_PROP_FOURCC]
-                    self.assertEqual(len(fourcc_calls), 0 if choice == 'msmf' else 1)
+                    self.assertEqual(len(fourcc_calls), 0)
 
     def test_msmf_second_open_failure_cleans_up_and_explains_pair_failure(self):
         one, two = capture(), capture()
@@ -46,7 +46,7 @@ class CameraBackendTests(unittest.TestCase):
         with patch('magicpointer.cameras.platform.system', return_value='Windows'), \
                 patch('cv2.VideoCapture', side_effect=[one, two]):
             with self.assertRaisesRegex(ValueError, 'Backend: msmf; earlier camera is already open'):
-                Cameras(1, 2, backend='msmf')
+                Cameras(1, 2)
         one.release.assert_called_once()
         two.release.assert_called_once()
 
@@ -57,18 +57,17 @@ class CameraBackendTests(unittest.TestCase):
                 pass
             opened.assert_called_once_with(0, cv2.CAP_ANY)
             opened.reset_mock()
-            for choice in ('dshow', 'msmf'):
-                with self.assertRaisesRegex(ValueError, 'require Windows'):
-                    Cameras(0, backend=choice)
+            with self.assertRaisesRegex(ValueError, 'requires Windows'):
+                Cameras(0, backend='msmf')
             opened.assert_not_called()
 
     def test_invalid_capture_settings_rejected_before_open(self):
         with patch('cv2.VideoCapture') as opened:
-            for settings in ({'width': 0}, {'height': -1}, {'backend': 'unknown'}):
+            for settings in ({'width': 0}, {'height': -1}, {'backend': 'unknown'}, {'backend': 'dshow'}):
                 with self.assertRaises(ValueError):
                     Cameras(**settings)
             opened.assert_not_called()
-        for settings in (['--capture-width', '0'], ['--capture-height', '-1'], ['--camera-backend', 'unknown']):
+        for settings in (['--capture-width', '0'], ['--capture-height', '-1'], ['--camera-backend', 'unknown'], ['--camera-backend', 'dshow']):
             with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 parser().parse_args(['run', *settings])
 
@@ -76,9 +75,9 @@ class CameraBackendTests(unittest.TestCase):
         device = MagicMock()
         device.__enter__.return_value.info = [{'index': 0, 'backend': 'msmf'}]
         with patch('magicpointer.cameras.Cameras', return_value=device) as opened, redirect_stdout(io.StringIO()):
-            self.assertEqual(main(['cameras', '--limit', '2', '--camera-backend', 'msmf',
+            self.assertEqual(main(['cameras', '--limit', '2',
                                    '--capture-width', '640', '--capture-height', '480', '--fps', '30']), 0)
-        self.assertEqual(opened.call_args_list, [call(i, fps='30', backend='msmf', width=640, height=480) for i in (0, 1)])
+        self.assertEqual(opened.call_args_list, [call(i, fps='30', backend='default', width=640, height=480) for i in (0, 1)])
 
 
 if __name__ == '__main__':
