@@ -1,6 +1,7 @@
 """Startup stays usable even when vision libraries or camera devices are absent."""
 import argparse
 import math
+import os
 from pathlib import Path
 import sys
 
@@ -97,6 +98,21 @@ def parser():
     cmd.add_argument("--output", type=Path, default=Path("diagnostics"))
     cmd.add_argument("--dead-zone", type=positive, default=10., help="neutral half-width in degrees (default: +/-10)")
     cmd.add_argument("--full-speed-angle", type=positive, default=30., help="angle from neutral for full speed (default: 30 degrees)")
+    cmd = commands.add_parser("compare-models", help="debug-only switchable MediaPipe/RTMPose/WiLoR comparison; no OS input")
+    capture_options(cmd)
+    cmd.add_argument('--left', type=camera, default=0)
+    cmd.add_argument('--right', type=camera)
+    cmd.add_argument('--fps', choices=('auto', '30', '60'), default='30')
+    cmd.add_argument('--models', nargs='+', choices=('mediapipe', 'rtmpose', 'wilor'),
+                     default=['mediapipe', 'rtmpose', 'wilor'])
+    cmd.add_argument('--model', type=Path, default=Path('models/hand_landmarker.task'))
+    cmd.add_argument('--model-dir', type=Path, default=Path('models/comparison'))
+    cmd.add_argument('--max-hands', type=hand_limit, default=4)
+    cmd.add_argument('--output', type=Path, default=Path('diagnostics'))
+    cmd.add_argument('--wilor-python', type=Path, default=Path('.venv-wilor/Scripts/python.exe' if os.name == 'nt' else '.venv-wilor/bin/python'))
+    cmd.add_argument('--wilor-device', choices=('cpu', 'cuda'), default='cuda')
+    cmd.add_argument('--worker-timeout', type=positive, default=600., help='WiLoR startup/inference timeout in seconds')
+    cmd.add_argument('--prepare', action='store_true', help='download selected models and check blank-frame inference without opening cameras')
     return root
 
 
@@ -107,10 +123,13 @@ def main(argv=None):
         root.print_help()
         return 0
     try:
-        if args.command in ("run", "calibrate") and args.left == args.right:
+        if args.command in ("run", "calibrate", "compare-models") and args.left == args.right:
             raise ValueError("Select different left and right camera indices")
         if args.command == "run":
             from .app import run
+            return run(args)
+        if args.command == 'compare-models':
+            from .comparison_app import run
             return run(args)
         if args.command == "collect":
             from .diagnostics import run

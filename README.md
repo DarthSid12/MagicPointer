@@ -49,6 +49,15 @@ The initial Matplotlib font-cache message, GPU/Metal information, XNNPACK CPU
 delegate message and feedback-tensor warnings do not explain this permission
 failure; the model has initialized before the camera is opened.
 
+## Compare hand models (debug experiment)
+
+Use the [three-model setup and trial guide](docs/model-comparison.md) for the
+separate `compare-models` command: **1** MediaPipe, **2** RTMPose-Hand, **3** WiLoR,
+or **A** to compare identical frames. It records data only and sends no desktop
+input. WiLoR has a separate CUDA environment for the RTX 4060. No filters or
+adaptive sensitivity retries are used. RTMPose offers 2D joints; MediaPipe/WiLoR
+also exercise the shared 3D geometry classifier.
+
 ## Try one camera first
 
 ```sh

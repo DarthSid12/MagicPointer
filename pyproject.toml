@@ -14,6 +14,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+comparison = [
+  "rtmlib==0.0.13",
+  "onnxruntime==1.19.2",
+  "tqdm==4.67.1",
+]
 macos = [
   "pyobjc-core==10.3.2; sys_platform == 'darwin'",
   "pyobjc-framework-Cocoa==10.3.2; sys_platform == 'darwin'",

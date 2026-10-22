@@ -558,3 +558,53 @@ render/engine/log paths, cursor continuity across stereo/left/right/stereo, and
 mocked desktop dispatch with one detecting view. Camera frames and OS adapters
 were synthetic/mocked; no real desktop input was sent. Live control/accuracy and
 Windows acceptance remain pending.
+
+
+## 16: Switchable MediaPipe / RTMPose-Hand / WiLoR debug experiment
+
+`compare-models` is a separate preview with 1/2/3 model switching, A for identical
+frames across enabled backends, H/N/U presence labels, D near/far labels and
+automatic data-only JSON/JSONL/ZIP output. It has no OS input or virtual pointer.
+MediaPipe and WiLoR exercise the shared 3D gesture estimator/selection; RTMPose
+is explicitly a 2D joint/detection comparison without fabricated depth. All models
+receive original BGR frames plus their own native preprocessing; no classical
+filters or adaptive threshold retries are present.
+
+MediaPipe keeps CPU VIDEO 0.65 detection/presence/tracking settings and independent
+trackers per camera. RTMDet-nano 320x320 + RTMPose-m Hand5 256x256 uses rtmlib
+0.0.13/ONNX Runtime 1.19.2 CPU and official checksummed model archives. An empty
+RTMDet result skips RTMPose's whole-image fallback. WiLoR uses pinned WiLoR-mini
+`ebec42f94c389070cdd7dda6fd1bf0b4a659c960`, PyTorch 2.5.0 float32, an isolated
+worker environment and in-memory raw-BGR transport. Its CUDA mode fails clearly
+if CUDA is unavailable; local checks used CPU. Native GPU work is synchronized
+for inference timing. Upstream auto-installation is disabled; the concrete dill
+dependency discovered by loading detector.pt is now in requirements-wilor.txt.
+Legacy chumpy aliases are confined to the worker. Hashes of the large assets are
+streamed rather than loading extra GB into memory. Assets/environments are ignored
+by Git and no weights or external demo images are committed.
+
+The final batched local suite ran **141 tests: 140 passed, one Windows ABI skip**.
+It covers actual render/engine/archive paths with synthetic camera input, all
+available-view regression cases from 12.2, switch/same-frame behavior, absent-3D
+handling, false/no-detection denominators, trial-boundary gap resets, worker raw
+byte transport and cleanup, duplicate-camera rejection and no desktop creation
+for the comparison command. Both environments pass pip check. CLI help,
+compilation (with writable /tmp bytecode cache) and git whitespace checks pass.
+Initial compilation only failed because macOS selected a cache outside the
+sandbox; the explicit writable cache check passed.
+
+Real-model validation used a black 640x480 image and the pinned upstream
+WiLoR-mini assets/img.png. The positive image ran in both view slots (duplicate
+demo images, not physical stereo); the blank image used the primary view slot. All model outputs had finite 21x2 original-image joints;
+MediaPipe/WiLoR supplied finite 21x3 native joints, RTMPose supplied no 3D. Hand
+counts on that one positive image were MediaPipe 2/2, RTMPose 1/1, WiLoR 2/2.
+The blank image produced 0/1/0 hands respectively: RTMPose's false detection is
+recorded as B15, without hiding it or tuning a threshold during comparison.
+These are adapter smoke checks, not a model-quality ranking. The six-cell actual
+model preview was rendered and visually inspected. No user camera images,
+video/audio, real cameras or desktop input were recorded or used in these checks.
+
+Windows Python 3.11 installation, RTX 4060 CUDA execution, sustained two-camera
+performance, near/far landmark accuracy, identity recovery and the new approximate
+control policy still require the user's live trial. No replacement for MediaPipe
+is selected. See docs/model-comparison.md for setup, controls, caveats and sources.
