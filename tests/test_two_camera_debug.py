@@ -18,7 +18,8 @@ from test_tracking import hand
 
 
 def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=False,
-                 missing_right=False, capture_error=False, resolution=(1920, 1080), scene=None, frame_count=70, force_uncalibrated=False):
+                 missing_right=False, capture_error=False, resolution=(1920, 1080), scene=None, frame_count=70, force_uncalibrated=False,
+                 capture_args=()):
     """Real app render/engine/archive path, synthetic cameras and stereo geometry."""
     geometry = rig()
     geometry['camera_indices'] = [0, 1]
@@ -70,9 +71,9 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
             geometry['camera_indices'] = [1, 0]
             path.write_text(json.dumps(geometry))
         args = parser().parse_args(['run', '--debug', '--left', '0', '--right', '1',
-                                   '--calibration', str(path), '--output', directory, '--mute'])
+                                   '--calibration', str(path), '--output', directory, '--mute', *capture_args])
         args.uncalibrated = force_uncalibrated
-        with patch.object(app, 'Cameras', return_value=camera), patch.object(app, 'Tracker', side_effect=trackers), \
+        with patch.object(app, 'Cameras', return_value=camera) as open_cameras, patch.object(app, 'Tracker', side_effect=trackers), \
                 patch.object(app, 'Chimes', return_value=audio), patch.object(app.time, 'monotonic', side_effect=tick), \
                 patch.object(Stereo, 'check_markers', return_value=(marker_ok, 'Show wall markers')) as markers, \
                 patch.object(app.cv2, 'imshow', side_effect=lambda _, image: displays.__setitem__(slice(None), [image.copy()])), \
@@ -86,6 +87,8 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
             else:
                 assert app.run(args) == 0
             desktop.assert_not_called()
+            open_cameras.assert_called_once_with(0, 1, args.fps, backend=args.camera_backend,
+                                                 width=args.capture_width, height=args.capture_height)
         with zipfile.ZipFile(next(Path(directory).glob('debug-*.zip'))) as archive:
             metadata = json.loads(archive.read('session.json'))
             rows = [json.loads(line) for line in archive.read('samples.jsonl').splitlines()]
@@ -93,6 +96,14 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
 
 
 class TwoCameraDebugTests(unittest.TestCase):
+    def test_msmf_low_resolution_debug_routes_capture_options(self):
+        metadata, rows, _, _, _, _, _ = dual_session(
+            'missing', frame_count=2, resolution=(640, 480), force_uncalibrated=True,
+            capture_args=('--camera-backend', 'msmf', '--capture-width', '640', '--capture-height', '480', '--fps', '30'))
+        self.assertTrue(metadata['preview_only'])
+        self.assertEqual(metadata['cameras'][0]['width'], 640)
+        self.assertEqual(len(rows), 2)
+
     def test_missing_invalid_and_wrong_pair_calibration_support_shared_uncalibrated_testing(self):
         for mode in ('missing', 'invalid', 'wrong_pair'):
             with self.subTest(mode=mode):

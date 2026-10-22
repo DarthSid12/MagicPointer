@@ -65,7 +65,8 @@ def run(args):
     grid[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2) * args.square_mm / 1000
     window = "MagicPointer calibration - Q cancels"
     try:
-        with Cameras(args.left, args.right, args.fps) as cameras:
+        with Cameras(args.left, args.right, args.fps, backend=args.camera_backend,
+                     width=args.capture_width, height=args.capture_height) as cameras:
             print("Cameras:", cameras.info)
             print("SPACE: capture varied checkerboard views; C: solve after 15; Q: cancel")
             while True:

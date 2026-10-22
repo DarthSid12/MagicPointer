@@ -164,7 +164,8 @@ def run(args):
             from .desktop import Desktop
             desktop = Desktop()
         audio = Chimes(args.mute)
-        with Cameras(args.left, args.right, args.fps) as cameras:
+        with Cameras(args.left, args.right, args.fps, backend=args.camera_backend,
+                     width=args.capture_width, height=args.capture_height) as cameras:
             if stereo and args.debug and any((camera['width'], camera['height']) != stereo.size for camera in cameras.info):
                 stereo = None
                 preview_only = True

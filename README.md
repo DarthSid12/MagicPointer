@@ -151,6 +151,29 @@ include built-in or virtual cameras and can change after reconnecting devices.
 The feeds are labelled raw views, with pointer X mirroring controlled separately.
 Q, Escape, closing the window or Ctrl+C stops both streams and saves the archive.
 
+### Windows: each camera works alone, but the second cannot open
+
+Try Media Foundation instead of the default DirectShow capture backend. For the
+two cameras at indices 1 and 2, start with a lower resolution:
+
+```powershell
+python -m magicpointer run --debug --uncalibrated --left 1 --right 2 --camera-backend msmf --capture-width 640 --capture-height 480 --fps 30
+```
+
+Use your actual camera indices. Confirm both displayed feeds belong to the intended
+cameras: index ordering can differ between backends. The console and diagnostic
+archive report the backend and actual negotiated resolution/FPS; drivers may ignore
+requested settings. A low-resolution preview does not establish distant-hand accuracy.
+
+The same `--camera-backend`, `--capture-width` and `--capture-height` options work
+with `cameras` and `calibrate`. Probe indices with
+`python -m magicpointer cameras --camera-backend msmf --capture-width 640 --capture-height 480 --fps 30`.
+For a higher-resolution trial, request `--capture-width 1920 --capture-height 1080`.
+Calibrate with the backend, camera order and resolution you intend to use, then
+retain those settings for calibrated runs. Recalibrate after changing capture
+geometry or camera assignment. Windows backend choices are `dshow` and `msmf`;
+`default` keeps DirectShow on Windows and the system backend on macOS.
+
 ## Prepare and calibrate the fixed stereo rig
 
 Place both 1080p cameras near the TV with overlapping views and a rigid mount.

@@ -470,3 +470,27 @@ Both jobs passed dependency checks, regression tests, CLI startup, model downloa
 and real blank-frame inference. Preliminary B10 analysis is recorded in
 reports/B10-distance-analysis.md using the exact archive confirmed by the user;
 no distance fix is included in the validated main checkpoint.
+
+
+## B13 Windows simultaneous camera startup
+
+User reports each external camera works alone, but whichever opens second fails
+under DirectShow, even with requested 640x480/30 FPS and separate laptop ports.
+The Media Foundation diagnostic returned valid frames from both camera indices.
+This supports an explicit MSMF workaround; it does not identify a specific driver
+or USB fault or establish 1080p operation.
+
+Added --camera-backend and requested capture dimensions to run, calibrate and
+camera probing. The default policy remains DirectShow on Windows and the system
+backend elsewhere. Both streams use the selected backend, and MSMF negotiates
+its format without forcing MJPG, matching the successful diagnostic. Actual
+backend and negotiated size/FPS are included in capture metadata. README documents
+camera assignment and calibration consistency after switching capture settings.
+
+Local final validation: 120 tests run, 119 passed, one Windows-only ABI skip;
+`python -m pip check`, run/calibrate/cameras help and `git diff --check` passed.
+Regression checks cover both streams using MSMF, default Windows/macOS selection,
+rejected settings/platform combinations, release on second-open failure, camera
+probe routing and the full synthetic low-resolution debug path. Windows capture
+calls are mocked locally. Full Windows debug preview, physical feed identity,
+long-running simultaneous capture and higher-resolution behavior need live retest.

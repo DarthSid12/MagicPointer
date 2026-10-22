@@ -28,12 +28,27 @@ def hand_limit(value):
     return number
 
 
+def pixels(value):
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError("capture dimension must be positive")
+    return number
+
+
+def capture_options(cmd):
+    cmd.add_argument("--camera-backend", choices=("default", "dshow", "msmf"), default="default",
+                     help="capture API: default uses DirectShow on Windows; dshow/msmf require Windows")
+    cmd.add_argument("--capture-width", type=pixels, default=1920, help="requested camera width in pixels (default: 1920)")
+    cmd.add_argument("--capture-height", type=pixels, default=1080, help="requested camera height in pixels (default: 1080)")
+
+
 def parser():
     root = argparse.ArgumentParser(description="MagicPointer: Windows-first stereo hand pointer")
     root.add_argument("--version", action="version", version=__version__)
     commands = root.add_subparsers(dest="command")
     for name in ("run", "calibrate"):
         cmd = commands.add_parser(name)
+        capture_options(cmd)
         cmd.add_argument("--left", type=camera, default=0, help="primary camera index (default: 0)")
         cmd.add_argument("--right", type=camera, required=name == "calibrate", help="secondary camera index")
         cmd.add_argument("--fps", choices=("auto", "30", "60"), default="auto", help="requested capture rate; driver may negotiate a lower rate")
@@ -60,6 +75,7 @@ def parser():
     cmd = commands.add_parser("download-model", help="download checksum-verified official hand model")
     cmd.add_argument("--output", type=Path, default=Path("models/hand_landmarker.task"))
     cmd = commands.add_parser("cameras", help="probe camera indices and report negotiated settings")
+    capture_options(cmd)
     cmd.add_argument("--limit", type=camera, default=4)
     cmd.add_argument("--fps", choices=("auto", "30", "60"), default="auto")
     cmd = commands.add_parser("collect", help="guided one-camera gesture diagnostics; no desktop input or video recording")
@@ -117,7 +133,8 @@ def main(argv=None):
             found = 0
             for index in range(args.limit):
                 try:
-                    with Cameras(index, fps=args.fps) as devices:
+                    with Cameras(index, fps=args.fps, backend=args.camera_backend,
+                                 width=args.capture_width, height=args.capture_height) as devices:
                         print(devices.info[0])
                         found += 1
                 except ValueError as error:
