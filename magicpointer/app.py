@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
+import ctypes
+import platform
 import time
 
 import cv2
@@ -13,6 +16,7 @@ from .tilt import measure, measure_wrist, direction_pitch
 from .fusion import combine
 from .ownership import HandOwner
 from .adaptive_detection import AdaptiveDetection
+from .recovery import CropRecovery
 
 COLORS = {"inactive": (150, 150, 150), "active": (70, 210, 70),
           "click": (220, 120, 240), "scroll": (240, 180, 30), "unavailable": (0, 160, 255)}
@@ -79,6 +83,57 @@ def large_gesture(panel, selection, owner, engine, color, ready=True, available=
         cv2.putText(panel, text, ((1280-width)//2, baseline), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 3, cv2.LINE_AA)
 
 
+def high_resolution_timer():
+    """Request 1 ms Windows timers; otherwise waitKey(1) and short sleeps take ~15.6 ms."""
+    if platform.system() != "Windows":
+        return lambda: None
+    try:
+        winmm = ctypes.WinDLL("winmm")
+        winmm.timeBeginPeriod(1)
+        return lambda: winmm.timeEndPeriod(1)
+    except (OSError, AttributeError):
+        return lambda: None
+
+
+class MarkerWatch:
+    """Periodic wall-marker checks off the processing loop.
+
+    ArUco detection on two full frames can take tens to hundreds of
+    milliseconds, which used to stall control once a second. A single bad
+    check (for example a partly occluded marker) no longer ends the session:
+    displacement must be seen on `failures` consecutive checks.
+    """
+
+    def __init__(self, stereo, interval=1., failures=3):
+        self.stereo, self.interval, self.failures = stereo, interval, failures
+        self.pool = ThreadPoolExecutor(max_workers=1)
+        self.pending, self.next_check, self.failed = None, 0., 0
+
+    def poll(self, images, now):
+        if self.pending is not None and self.pending.done():
+            good, message = self.pending.result()
+            self.pending = None
+            self.failed = 0 if good else self.failed + 1
+            if self.failed >= self.failures:
+                raise ValueError(message)
+        if self.pending is None and now >= self.next_check:
+            self.pending = self.pool.submit(self.stereo.check_markers, list(images), require_visible=False)
+            self.next_check = now + self.interval
+
+    def close(self):
+        self.pool.shutdown(wait=False, cancel_futures=True)
+
+
+def detect_views(trackers, frames, pool):
+    """Run each camera's detector, in parallel when a pool is given (MediaPipe releases the GIL)."""
+    def timed(tracker, frame):
+        start = time.perf_counter()
+        hands = tracker.detect_all(frame.image, frame.grabbed_at)
+        return hands, (time.perf_counter() - start) * 1000
+    results = list(pool.map(timed, trackers, frames)) if pool else [timed(t, f) for t, f in zip(trackers, frames)]
+    return [hands for hands, _ in results], [ms for _, ms in results]
+
+
 def index_only(hand):
     metrics = gesture_metrics(hand.world)
     return metrics['valid'] and [metrics['fingers'][name]['state'] for name in
@@ -138,15 +193,15 @@ def run(args):
     preview_only = two_cameras and stereo is None
     engine = Engine(width=args.workspace_width * (10 if stereo is None else 1),
                     height=args.workspace_height * (10 if stereo is None else 1), mirror_x=args.mirror_x,
-                    activation_dwell=2.5, retain_activation_on_loss=True, activation_grace=.4)
-    owner = HandOwner(2 if two_cameras else 1)
+                    activation_dwell=args.activation_seconds, retain_activation_on_loss=True, activation_grace=.4)
+    owner = HandOwner(2 if two_cameras else 1, dwell=args.activation_seconds)
     previous_key = None
     trackers, audio, desktop = [], None, None
-    log, adaptive = None, None
+    log, adaptive, pool, watch, recovery = None, None, None, None, None
+    end_timer = high_resolution_timer()
     window = "MagicPointer - Q / Escape stops"
     mono_scale = 1.
     verified, verification_count = not two_cameras, 0
-    next_marker_check = 0.
     previous_wrist, previous_wrist_time = None, None
     try:
         if args.debug:
@@ -161,6 +216,8 @@ def run(args):
                            'loss_timeout_seconds': engine.loss_timeout, 'retain_activation_on_loss': True,
                            'activation_grace_seconds': engine.activation_grace,
                            'palm_release_policy': 'immediate two-view and fused agreement, otherwise 0.18s',
+                           'pipeline': {'capture': 'background newest-frame threads', 'parallel_detection': two_cameras,
+                                        'crop_recovery': args.crop_recovery, 'marker_checks': 'background, 3 consecutive failures stop'},
                            'termination': 'normal'})
             if args.adaptive_detection:
                 log.metadata['adaptive_detection'] = {'enabled': True, 'version': 1,
@@ -174,9 +231,13 @@ def run(args):
         trackers.append(Tracker(args.model, num_hands=args.max_hands))
         if two_cameras:
             trackers.append(Tracker(args.model, num_hands=args.max_hands))
+        if two_cameras:
+            pool = ThreadPoolExecutor(max_workers=2)
+        if args.crop_recovery:
+            recovery = CropRecovery(lambda: Tracker(args.model, num_hands=1, image_mode=True), len(trackers))
         if not args.debug:
-            from .desktop import Desktop
-            desktop = Desktop()
+            from .desktop import Desktop, SmoothDesktop
+            desktop = SmoothDesktop(Desktop(), smooth_scroll=args.smooth_scroll)
         audio = Chimes(args.mute)
         with Cameras(args.left, args.right, args.fps, backend=args.camera_backend,
                      width=args.capture_width, height=args.capture_height) as cameras:
@@ -196,7 +257,7 @@ def run(args):
                 print("Calibration:", calibration_issue)
             print("Camera negotiated settings:", cameras.info)
             print("DEBUG: preview only; no OS pointer input" if args.debug else "STEREO CONTROL: Q/Escape or close window to stop")
-            print("Show one fist for 2.5 seconds to select that hand; open its palm to release. Other hands are ignored.")
+            print(f"Show one fist for {args.activation_seconds:g} seconds to select that hand; open its palm to release. Other hands are ignored.")
             print("Two fingers toward screen: hold steady to set scroll neutral; tilt up/down. Index-only exits scrolling.")
             start, count, measured_fps = time.monotonic(), 0, 0.
             last_action, action_until = "", 0.
@@ -211,20 +272,24 @@ def run(args):
                 if stereo:
                     paired = stereo.check_frames(frames)
                 marker_message = "Mono preview: depth is not measured"
-                if stereo and (not verified or now >= next_marker_check):
-                    good, marker_message = stereo.check_markers([f.image for f in frames], require_visible=not verified)
-                    if not verified:
-                        verification_count = verification_count + 1 if good and paired else 0
-                        verified = verification_count >= 3
-                    elif not good:
-                        raise ValueError(marker_message)
-                    next_marker_check = now + 1.
-                detections = []
-                for index, (tracker, frame) in enumerate(zip(trackers, frames)):
-                    phase = time.perf_counter()
-                    detections.append(tracker.detect_all(frame.image, frame.grabbed_at))
-                    timings[f'detect_camera_{index}_ms'] = (time.perf_counter()-phase)*1000
+                if stereo and not verified:
+                    good, marker_message = stereo.check_markers([f.image for f in frames], require_visible=True)
+                    verification_count = verification_count + 1 if good and paired else 0
+                    verified = verification_count >= 3
+                elif stereo:
+                    if watch is None:
+                        watch = MarkerWatch(stereo)
+                    watch.poll([f.image for f in frames], now)
+                phase = time.perf_counter()
+                detections, detect_ms = detect_views(trackers, frames, pool)
+                for index, value in enumerate(detect_ms):
+                    timings[f'detect_camera_{index}_ms'] = value
+                timings['detect_total_ms'] = (time.perf_counter()-phase)*1000
                 baseline_detections, adaptive_trace = detections, None
+                if recovery:
+                    phase = time.perf_counter()
+                    detections = recovery.apply(detections, frames, now, pool)
+                    timings['crop_recovery_ms'] = (time.perf_counter()-phase)*1000
                 if adaptive:
                     phase = time.perf_counter()
                     detections, adaptive_trace = adaptive.apply(detections, frames, now, paired=paired)
@@ -232,6 +297,14 @@ def run(args):
                 phase = time.perf_counter()
                 selection = owner.select(detections, frames, now, stereo=stereo, scrolling=engine.scrolling)
                 timings['selection_ms'] = (time.perf_counter()-phase)*1000
+                if recovery:
+                    # Search where the selected owner was, or the nearest hand before selection.
+                    for view, hands_in_view in enumerate(detections):
+                        if owner.owner:
+                            if selection.hands and selection.hands[view] is not None:
+                                recovery.remember(view, selection.hands[view], now)
+                        elif hands_in_view:
+                            recovery.remember(view, max(hands_in_view, key=lambda hand: float(np.ptp(np.asarray(hand.pixels)[:, 0]))), now)
                 phase = time.perf_counter()
                 if not paired:
                     owner.palm_since, owner.release_ready = None, False
@@ -378,14 +451,25 @@ def run(args):
     finally:
         try:
             if log:
+                if recovery:
+                    log.metadata['crop_recovered_frames_per_camera'] = recovery.recovered
                 log.close()
         finally:
             if audio:
                 if engine.active:
                     audio.play(False)
                 audio.close()
+            if desktop:
+                desktop.close()
+            if watch:
+                watch.close()
+            if recovery:
+                recovery.close()
+            if pool:
+                pool.shutdown(wait=True)
             for tracker in trackers:
                 tracker.close()
             if adaptive:
                 adaptive.close()
             cv2.destroyAllWindows()
+            end_timer()

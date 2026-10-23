@@ -64,6 +64,12 @@ def parser():
             cmd.add_argument("--mirror-x", action=argparse.BooleanOptionalAction, default=True)
             cmd.add_argument("--mute", action="store_true")
             cmd.add_argument("--max-hands", type=hand_limit, default=4, help="maximum hands detected per camera (1-8, default: 4)")
+            cmd.add_argument("--activation-seconds", type=positive, default=2.5,
+                             help="fist hold that selects and activates a hand (default: 2.5)")
+            cmd.add_argument("--crop-recovery", action=argparse.BooleanOptionalAction, default=True,
+                             help="re-detect a recently lost hand in a magnified crop around its last position")
+            cmd.add_argument("--smooth-scroll", action=argparse.BooleanOptionalAction, default=True,
+                             help="send fine-grained wheel steps; --no-smooth-scroll sends whole lines for apps that ignore fine wheel input")
         else:
             cmd.add_argument("--square-mm", type=positive, default=25., help="measured checkerboard square edge in mm")
             cmd.add_argument("--marker-size", type=positive, required=True, help="measured wall marker black square edge in metres")

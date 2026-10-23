@@ -275,17 +275,39 @@ With a matching `calibration.json`, debug verifies the wall markers before
 allowing simulated activation. Without usable calibration, debug uses the
 uncalibrated testing mode described above. Real desktop control always requires valid
 calibration and marker verification. Marker verification replaces repeating the full checkerboard process
-when the rig stays fixed. During use, visible markers are checked periodically;
-a detected displacement stops the app and requires recalibration. Hidden markers
+when the rig stays fixed. During use, visible markers are checked about once a
+second in the background, so checks never stall the pointer. A displacement seen
+on three consecutive checks stops the app and requires recalibration; a single
+bad reading, such as a partly occluded marker, does not. Hidden markers
 cannot reveal a moved rig, so keep them visible when possible.
 
 **Q, Escape, Ctrl+C, or closing the window stops the application.** An open palm
-also deactivates pointer control while keeping the application running. Camera
-failures end the app with a readable error. Missing/rejected views or a processing
+also deactivates pointer control while keeping the application running. If a
+camera stops delivering frames, it is reopened in the background; only a stream
+that stays down for 5 seconds ends the app with a readable error. Missing/rejected views or a processing
 stall pause input while retaining the selected owner and activation. Gaps of up to
 0.10 s are bridged without pausing; bridged frames never count toward a gesture
 hold or trigger an action. There is no one-camera fallback. Input resumes with the same confidently matched hand, with
 pending click/scroll state cleared and pointer position rebased.
+
+## Smoothness and responsiveness
+
+- **Newest frames only.** Each camera is read on its own thread, so processing
+  never waits on a camera or works on a frame the driver buffered earlier. With
+  two cameras, a lagging view gets one frame to catch up before pairing.
+- **Parallel detection.** Both cameras' hand detectors run at the same time.
+- **Smooth pointer.** The OS pointer glides at 120 Hz between vision frames and
+  lands exactly on target before every click.
+- **Smooth scrolling.** Wrist scrolling is sent as fine wheel increments
+  (high-resolution wheel units on Windows, pixels on macOS). Use
+  `--no-smooth-scroll` for an app that ignores fine wheel input.
+- **Lost-hand recovery.** When a hand seen in the last 1.5 seconds disappears
+  from a view, that view is searched again in a magnified crop around the hand's
+  last position, which helps most at a distance. Recovered hands still pass all
+  ownership and cross-camera checks. Disable with `--no-crop-recovery`.
+- **Windows timers** run at 1 ms resolution while the app is open, instead of
+  the default ~15.6 ms that slowed every loop.
+- `--activation-seconds` sets the fist hold that selects a hand (default 2.5).
 
 ## Gestures
 

@@ -22,4 +22,6 @@ Recording a bug does not authorize fixing it. Keep resolved entries for history.
 
 | B15 | Gesture recognition flickers under landmark jitter; single misread or missing frames restart click holds or pause input, so clicks are missed. | 3, 5, 6, 7, 8, 12 | Yes (synthetic validation); live confirmation pending | B15: Per-pair digit hysteresis over the version 2 classifier, 0.10 s dropout grace that neither restarts nor credits holds, stereo checks limited to used joints plus thumb, One-Euro pointer filter and pre-pose click position. Related to B2 and B6. Suite: 146 tests, 145 passed, 1 Windows-only skipped. See reports/B15-gesture-stability.md. |
 
-Next bug number: **B16**.
+| B16 | Periodic wall-marker checks run on the processing loop, stalling it up to ~250 ms per check on noisy frames, and a single displaced-marker reading ends the session. | 2, 4 | Yes (synthetic validation); live confirmation pending | B16: Checks run on a background thread and stop control only after three consecutive failures. Found during the feature 14 audit. See reports/14-experience-audit.md. |
+
+Next bug number: **B17**.
