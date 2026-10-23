@@ -7,6 +7,7 @@ import numpy as np
 
 from .engine import Gesture
 from .fusion import combine
+from .tracking import PoseStabilizer
 
 
 class LocalHands:
@@ -91,6 +92,7 @@ class HandOwner:
         self.palm_since = None
         self.release_ready = False
         self.diagnostics = {}
+        self.stabilizers = {}
 
     def release(self):
         self.owner = self.candidate = self.since = None
@@ -108,6 +110,7 @@ class HandOwner:
                                       self.owner[index] if self.owner else None)
                         for index, (tracker, hands, frame) in enumerate(zip(self.locals, detections, frames))]
         self.diagnostics = {'timestamp': now, 'pairs': [], 'ambiguous_pair_margins': []}
+        self.stabilizers = {key: value for key, value in self.stabilizers.items() if value.time is not None and now-value.time <= 1.}
         def result(key):
             hands = [view.get(track) for view, track in zip(self.visible, key)]
             details = {}
@@ -117,6 +120,10 @@ class HandOwner:
                 points = stereo.reconstruct(hands[0].pixels[list(anchors)], hands[1].pixels[list(anchors)])
                 if points is None:
                     fused, reason = None, 'Hands do not form a valid stereo pair'
+            if fused is not None:
+                # Each matched pair keeps its own digit hysteresis across frames.
+                details['frame_gesture'] = fused.gesture
+                fused.gesture = self.stabilizers.setdefault(key, PoseStabilizer()).update(fused.world, now)
             self.diagnostics['pairs'].append({'ids': key, 'reason': reason, 'valid': fused is not None,
                                                'gesture': fused.gesture if fused else None, **details})
             return Selection(key, hands, fused, reason, spread=spread)

@@ -282,8 +282,9 @@ cannot reveal a moved rig, so keep them visible when possible.
 **Q, Escape, Ctrl+C, or closing the window stops the application.** An open palm
 also deactivates pointer control while keeping the application running. Camera
 failures end the app with a readable error. Missing/rejected views or a processing
-stall pause input while retaining the selected owner and activation. There is no
-one-camera fallback. Input resumes with the same confidently matched hand, with
+stall pause input while retaining the selected owner and activation. Gaps of up to
+0.10 s are bridged without pausing; bridged frames never count toward a gesture
+hold or trigger an action. There is no one-camera fallback. Input resumes with the same confidently matched hand, with
 pending click/scroll state cleared and pointer position rebased.
 
 ## Gestures
@@ -292,7 +293,7 @@ pending click/scroll state cleared and pointer position rebased.
 | --- | --- |
 | One closed fist in the shared view, held 2.5 s | Select and lock that hand; activation chime; fist wrist becomes origin; cursor centers on primary display |
 | Index extended, other fingers curled | Index tip moves pointer within the local workspace |
-| Index + thumb | One left click after 0.18 s of stable recognition |
+| Index + thumb | One left click after 0.18 s of stable recognition, at the pointer position from just before the thumb opened |
 | Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |
 | Index + thumb + middle outside scrolling | One right click after 0.18 s of stable recognition |
 | Selected hand fully open | Stop input; two-view palm agreement releases immediately, otherwise confirm after 0.18 s; deactivation chime |
@@ -300,7 +301,9 @@ pending click/scroll state cleared and pointer position rebased.
 Open the fingers for a click chord together: holding thumb-only long enough is a
 left click, even if you later add the middle finger. After a click, return to
 index-only or a fist for 0.18 s before another click or scroll. Holding a click
-pose does not repeat clicks. Unrecognized poses produce no pointer actions.
+pose does not repeat clicks. The pointer holds still while a click pose is held.
+Unrecognized poses produce no pointer actions; a briefly unrecognized frame within
+0.10 s neither restarts nor extends the current gesture's hold.
 
 While scrolling, the pointer stays over its current target and thumb estimates
 are ignored. Hold the two fingers toward the screen steadily for about half a
@@ -330,7 +333,8 @@ the activation fist. Resuming after scrolling shifts its mapping to keep the
 pointer at its frozen location. Both whole-hand motion and index-tip motion affect it. A default
 40 × 25 cm workspace maps to the primary display; depth changes do not resize it.
 The cursor is driven by tip **position**, rather than a ray projected along the
-finger. Ring and little fingers stay curled for pointing/clicking/scrolling.
+finger, through a One-Euro filter that smooths jitter at rest with little lag
+during motion. Ring and little fingers stay curled for pointing/clicking/scrolling.
 
 ```sh
 python -m magicpointer run --left 0 --right 1 --fps 60 --workspace-width 0.50 --workspace-height 0.30

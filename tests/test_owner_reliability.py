@@ -49,6 +49,18 @@ class RetainedControlTests(unittest.TestCase):
         for _ in range(3): events += self.step(Gesture.RIGHT)
         self.assertEqual([event.value for event in events if event.kind=='click'], ['right'])
 
+    def test_brief_missing_pair_is_bridged_without_pause_or_dwell_credit(self):
+        self.activate()
+        for _ in range(3): self.step(Gesture.POINT, dt=.03)
+        events = self.step(Gesture.LEFT, dt=.03)
+        # Missing pairs within the grace period: no pause, no latch, no hold time.
+        events += self.step(None, dt=.03) + self.step(None, dt=.03)
+        self.assertFalse(self.engine.paused)
+        events += self.step(Gesture.LEFT, dt=.03)
+        self.assertFalse(any(event.kind == 'click' for event in events))
+        for _ in range(5): events += self.step(Gesture.LEFT, dt=.03)
+        self.assertEqual([event.value for event in events if event.kind == 'click'], ['left'])
+
     def test_brief_unknown_or_missing_does_not_discard_valid_fist_evidence(self):
         self.step(Gesture.FIST)
         self.step(Gesture.FIST)
