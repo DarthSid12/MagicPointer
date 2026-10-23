@@ -14,7 +14,7 @@ spec.loader.exec_module(evaluation)
 
 class EvaluationTests(unittest.TestCase):
     def test_replay_reports_improvement_and_dwell_without_exposing_samples(self):
-        points = hand(True, [1, 1, 0, 0])
+        points = hand(True, [1, 0, 0, 1])  # index + little finger right click
         points[2:5] = [[-.04, -.03, 0.], [-.05, -.055, 0.], [-.06, -.08, 0.]]
         samples = [{'step': 0, 'elapsed_seconds': t, 'detected': True,
                     'predicted': 'unrecognized', 'world_landmarks': points.tolist()} for t in (.03, .13, .23, .33)]

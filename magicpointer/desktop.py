@@ -1,6 +1,12 @@
 """Native primary-display input. Imported only for real stereo control."""
 import ctypes
+import math
 import platform
+import threading
+import time
+
+# Approximate macOS pixels per scroll line for continuous (pixel-unit) scrolling.
+MAC_LINE_PIXELS = 12
 
 
 class Desktop:
@@ -56,9 +62,17 @@ class Desktop:
         if self.width <= 0 or self.height <= 0:
             raise ValueError("Cannot determine primary display size")
 
+    def pixel(self, point):
+        return (self.offset[0] + round(point[0] * (self.width - 1)),
+                self.offset[1] + round(point[1] * (self.height - 1)))
+
+    @property
+    def wheel_step(self):
+        """Smallest scroll increment, in lines: one wheel unit or one macOS pixel."""
+        return 1 / 120 if self.system == "Windows" else 1 / MAC_LINE_PIXELS
+
     def move(self, point):
-        x = self.offset[0] + round(point[0] * (self.width - 1))
-        y = self.offset[1] + round(point[1] * (self.height - 1))
+        x, y = self.pixel(point)
         if self.system == "Windows":
             if not self.user32.SetCursorPos(int(x), int(y)):
                 raise OSError("Windows could not move the cursor")
@@ -94,3 +108,104 @@ class Desktop:
         else:
             q = self.quartz
             q.CGEventPost(q.kCGHIDEventTap, q.CGEventCreateScrollWheelEvent(None, q.kCGScrollEventUnitLine, 1, int(lines)))
+
+    def scroll_fine(self, lines):
+        """Fractional scroll: high-resolution wheel units on Windows, pixels on macOS."""
+        if self.system == "Windows":
+            self._send(0x0800, round(lines * 120))
+        else:
+            q = self.quartz
+            q.CGEventPost(q.kCGHIDEventTap, q.CGEventCreateScrollWheelEvent(
+                None, q.kCGScrollEventUnitPixel, 1, round(lines * MAC_LINE_PIXELS)))
+
+
+class SmoothDesktop:
+    """Glides the OS pointer between vision frames and spreads wheel steps over time.
+
+    Vision runs at 10-30 Hz, so moving the pointer only on each frame looks
+    jerky. A 120 Hz thread eases the pointer toward the latest target with a
+    time constant of half the observed frame interval, and drains scroll lines
+    as small wheel increments. Clicks first land the pointer exactly on target.
+    """
+
+    rate = 120.
+
+    def __init__(self, native, *, smooth_scroll=True, clock=time.monotonic, start=True):
+        self.native, self.smooth_scroll, self.clock = native, smooth_scroll, clock
+        self.lock = threading.Lock()
+        self.target = self.position = self.last_target = None
+        self.interval = 1 / 30
+        self.pending = self.carry = 0.
+        self.error = None
+        self.stopped = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True) if start else None
+        if self.thread:
+            self.thread.start()
+
+    def _raise_pending(self):
+        if self.error is not None:
+            error, self.error = self.error, None
+            raise error
+
+    def move(self, point):
+        self._raise_pending()
+        with self.lock:
+            now = self.clock()
+            if self.last_target is not None:
+                self.interval += .2 * (min(.2, now - self.last_target) - self.interval)
+            self.last_target, self.target = now, tuple(point)
+            if self.position is None:
+                self.position = self.target
+                self.native.move(self.position)
+
+    def click(self, button):
+        self._raise_pending()
+        with self.lock:
+            if self.target is not None and self.position != self.target:
+                self.position = self.target
+                self.native.move(self.position)
+            self.native.click(button)
+
+    def scroll(self, lines):
+        self._raise_pending()
+        if not self.smooth_scroll:
+            self.native.scroll(lines)
+            return
+        with self.lock:
+            self.pending += lines
+
+    def tick(self, dt):
+        with self.lock:
+            if self.target is not None and self.position != self.target:
+                tau = min(.06, max(.008, .5 * self.interval))
+                alpha = 1 - math.exp(-max(dt, 0.) / tau)
+                position = tuple(p + alpha * (t - p) for p, t in zip(self.position, self.target))
+                if max(abs(t - p) for t, p in zip(self.target, position)) < 1e-4:
+                    position = self.target
+                if self.native.pixel(position) != self.native.pixel(self.position):
+                    self.native.move(position)
+                self.position = position
+            if self.pending:
+                drained = self.pending if abs(self.pending) < .02 else self.pending * (1 - math.exp(-max(dt, 0.) / .08))
+                self.pending -= drained
+                self.carry += drained
+                step = self.native.wheel_step
+                units = math.trunc(self.carry / step)
+                if units:
+                    self.native.scroll_fine(units * step)
+                    self.carry -= units * step
+
+    def _run(self):
+        last = self.clock()
+        while not self.stopped.wait(1 / self.rate):
+            now = self.clock()
+            try:
+                self.tick(now - last)
+            except OSError as error:
+                self.error = error  # Re-raised by the next main-loop input call.
+            last = now
+
+    def close(self):
+        self.stopped.set()
+        if self.thread:
+            self.thread.join(timeout=1.)

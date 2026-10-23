@@ -89,12 +89,12 @@ class WristTests(unittest.TestCase):
 
     def test_open_thumb_does_not_cancel_wrist_downscroll_or_change_other_modes(self):
         self.calibrate()
-        # Mimic the reported downward tilt with an open-thumb/right-click label.
+        # Mimic the reported downward tilt with an open-thumb estimate (now unrecognized).
         for _ in range(25):
             self.now += .03
             sample = camera_pose(30., thumb=True)
             result = self.controller.update(sample, self.now)
-        self.assertEqual(sample.gesture, Gesture.RIGHT)
+        self.assertEqual(sample.gesture, Gesture.UNKNOWN)
         self.assertTrue(result['valid'])
         self.assertEqual(result['phase'], 'live')
         self.assertGreater(result['lines_per_second'], 11.9)

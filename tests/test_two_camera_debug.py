@@ -66,6 +66,7 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
         return ord('q') if index[0] >= frame_count else -1
 
     camera.read.side_effect = read
+    created = iter(trackers)
     for side, tracker in enumerate(trackers):
         tracker.detect_all.side_effect = (lambda *args, side=side: scene(index[0], side)) if scene else (lambda *args, detect=detect(side): ([result] if (result := detect(*args)) is not None else []))
     with tempfile.TemporaryDirectory() as directory:
@@ -80,7 +81,7 @@ def dual_session(calibration='valid', *, marker_ok=True, skew=.005, disagree=Fal
         args = parser().parse_args(['run', '--debug', '--left', '0', '--right', '1',
                                    '--calibration', str(path), '--output', directory, '--mute', *capture_args])
         args.uncalibrated = force_uncalibrated
-        with patch.object(app, 'Cameras', return_value=camera) as open_cameras, patch.object(app, 'Tracker', side_effect=trackers), \
+        with patch.object(app, 'Cameras', return_value=camera) as open_cameras, patch.object(app, 'Tracker', side_effect=lambda *a, **k: next(created, None) or recovery_tracker(*a, **k)), \
                 patch('magicpointer.adaptive_detection.Tracker', side_effect=recovery_tracker), \
                 patch.object(app, 'Chimes', return_value=audio), patch.object(app.time, 'monotonic', side_effect=tick), \
                 patch.object(Stereo, 'check_markers', return_value=(marker_ok, 'Show wall markers')) as markers, \
@@ -122,7 +123,8 @@ class TwoCameraDebugTests(unittest.TestCase):
         retry_hand = Hand(shape[:, :2]*1000+[320, 240], shape, 'Right', Gesture.FIST)
         metadata, rows, _, _, camera, _, _ = dual_session(
             'missing', frame_count=12, missing_right=True,
-            capture_args=('--adaptive-detection',), recovery_scene=lambda frame: [retry_hand])
+            # Isolate the experiment: crop recovery would also re-find the retried hand.
+            capture_args=('--adaptive-detection', '--no-crop-recovery'), recovery_scene=lambda frame: [retry_hand])
         self.assertTrue(metadata['adaptive_detection']['requires_both_views'])
         retries = [row for row in rows if row['adaptive_detection']['attempted_view'] is not None]
         self.assertGreater(len(retries), 0)
@@ -281,12 +283,23 @@ class TwoCameraDebugTests(unittest.TestCase):
         self.assertTrue(any(event['kind'] == 'activate' for row in rows for event in row['events']))
         markers.assert_not_called()
 
-    def test_uncalibrated_flag_cannot_enable_real_desktop_input(self):
-        args = parser().parse_args(['run', '--right', '1', '--uncalibrated'])
-        with patch.object(app.Stereo, 'load') as load, patch('magicpointer.desktop.Desktop') as desktop:
-            with self.assertRaisesRegex(ValueError, '--debug'):
-                app.run(args)
-            load.assert_not_called()
+    def test_uncalibrated_real_control_needs_no_calibration_and_drives_desktop(self):
+        for cameras in (['--right', '1'], []):
+            args = parser().parse_args(['run', '--uncalibrated', *cameras])
+            with self.subTest(cameras=cameras), patch.object(app.Stereo, 'load') as load, \
+                    patch('magicpointer.desktop.Desktop') as desktop, \
+                    patch.object(app, 'Cameras', side_effect=ValueError('no cameras in test')), \
+                    patch.object(app, 'Tracker'), patch.object(app, 'Chimes'), \
+                    patch.object(app.cv2, 'destroyAllWindows'), patch('builtins.print'):
+                with self.assertRaisesRegex(ValueError, 'no cameras in test'):
+                    app.run(args)
+                load.assert_not_called()
+                desktop.assert_called_once()
+
+    def test_one_camera_real_control_still_needs_uncalibrated_or_debug(self):
+        with patch('magicpointer.desktop.Desktop') as desktop:
+            with self.assertRaisesRegex(ValueError, '--uncalibrated'):
+                app.run(parser().parse_args(['run']))
             desktop.assert_not_called()
 
 

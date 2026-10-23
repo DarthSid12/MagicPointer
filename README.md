@@ -131,9 +131,18 @@ mode even when a calibration file exists, use:
 python -m magicpointer run --debug --uncalibrated --left 0 --right 1 --fps 30
 ```
 
-`--uncalibrated` is allowed only with `--debug`. After completing
-calibration, restart without `--uncalibrated`: **CALIBRATED STEREO** checks wall markers
-before enabling the usual fist/point/click/scroll virtual-pointer simulation.
+Without `--debug`, `--uncalibrated` drives the **real** pointer from the same
+approximate position, with one or two cameras and no printouts:
+
+```sh
+python -m magicpointer run --uncalibrated --left 0 --right 1 --fps 30
+```
+
+Hand movement is measured in palm lengths at activation, so the workspace keeps
+roughly the same physical size at any distance. There is no depth measurement or
+wall-marker check; open your palm, or press Q or Escape, to stop input. After
+completing calibration, restart without `--uncalibrated`: **CALIBRATED STEREO**
+checks wall markers before enabling the usual fist/point/click/scroll control.
 Pair timing, hand association, depth validity and tracking-loss checks still apply.
 
 Each camera extracts landmarks for all detected hands. A matched pair is normalized
@@ -273,19 +282,41 @@ python -m magicpointer run --left 0 --right 1 --fps 30
 
 With a matching `calibration.json`, debug verifies the wall markers before
 allowing simulated activation. Without usable calibration, debug uses the
-uncalibrated testing mode described above. Real desktop control always requires valid
-calibration and marker verification. Marker verification replaces repeating the full checkerboard process
-when the rig stays fixed. During use, visible markers are checked periodically;
-a detected displacement stops the app and requires recalibration. Hidden markers
+uncalibrated testing mode described above. Real desktop control uses calibration and
+marker verification unless `--uncalibrated` is given. Marker verification replaces repeating the full checkerboard process
+when the rig stays fixed. During use, visible markers are checked about once a
+second in the background, so checks never stall the pointer. A displacement seen
+on three consecutive checks stops the app and requires recalibration; a single
+bad reading, such as a partly occluded marker, does not. Hidden markers
 cannot reveal a moved rig, so keep them visible when possible.
 
 **Q, Escape, Ctrl+C, or closing the window stops the application.** An open palm
-also deactivates pointer control while keeping the application running. Camera
-failures end the app with a readable error. Missing/rejected views or a processing
+also deactivates pointer control while keeping the application running. If a
+camera stops delivering frames, it is reopened in the background; only a stream
+that stays down for 5 seconds ends the app with a readable error. Missing/rejected views or a processing
 stall pause input while retaining the selected owner and activation. Gaps of up to
 0.10 s are bridged without pausing; bridged frames never count toward a gesture
 hold or trigger an action. There is no one-camera fallback. Input resumes with the same confidently matched hand, with
 pending click/scroll state cleared and pointer position rebased.
+
+## Smoothness and responsiveness
+
+- **Newest frames only.** Each camera is read on its own thread, so processing
+  never waits on a camera or works on a frame the driver buffered earlier. With
+  two cameras, a lagging view gets one frame to catch up before pairing.
+- **Parallel detection.** Both cameras' hand detectors run at the same time.
+- **Smooth pointer.** The OS pointer glides at 120 Hz between vision frames and
+  lands exactly on target before every click.
+- **Smooth scrolling.** Wrist scrolling is sent as fine wheel increments
+  (high-resolution wheel units on Windows, pixels on macOS). Use
+  `--no-smooth-scroll` for an app that ignores fine wheel input.
+- **Lost-hand recovery.** When a hand seen in the last 1.5 seconds disappears
+  from a view, that view is searched again in a magnified crop around the hand's
+  last position, which helps most at a distance. Recovered hands still pass all
+  ownership and cross-camera checks. Disable with `--no-crop-recovery`.
+- **Windows timers** run at 1 ms resolution while the app is open, instead of
+  the default ~15.6 ms that slowed every loop.
+- `--activation-seconds` sets the fist hold that selects a hand (default 2.5).
 
 ## Gestures
 
@@ -295,11 +326,11 @@ pending click/scroll state cleared and pointer position rebased.
 | Index extended, other fingers curled | Index tip moves pointer within the local workspace |
 | Index + thumb | One left click after 0.18 s of stable recognition, at the pointer position from just before the thumb opened |
 | Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |
-| Index + thumb + middle outside scrolling | One right click after 0.18 s of stable recognition |
+| Index + little finger up, middle and ring curled (thumb either way) | One right click after 0.18 s of stable recognition |
 | Selected hand fully open | Stop input; two-view palm agreement releases immediately, otherwise confirm after 0.18 s; deactivation chime |
 
-Open the fingers for a click chord together: holding thumb-only long enough is a
-left click, even if you later add the middle finger. After a click, return to
+Right click shares no finger change with left click or scrolling, and raising
+the little finger does not move the index tip that drives the pointer. After a click, return to
 index-only or a fist for 0.18 s before another click or scroll. Holding a click
 pose does not repeat clicks. The pointer holds still while a click pose is held.
 Unrecognized poses produce no pointer actions; a briefly unrecognized frame within
@@ -323,9 +354,8 @@ fist-like classifier label while scrolling, provided its pitch remains valid.
 
 Stereo control uses triangulated finger direction in the primary camera's axes.
 The one-camera debug mode previews the same interaction using model-estimated
-pitch. Keep the cameras approximately level near the screen. Right-click entry
-still requires the normal thumb chord; once scrolling has started, that chord
-cannot click until you exit. Model thumb-estimation discrepancies during tilt
+pitch. Keep the cameras approximately level near the screen. Clicks are ignored
+while scrolling; exit with index-only first. Model thumb-estimation discrepancies during tilt
 are tracked in B6; ignoring them during scrolling does not correct the classifier.
 
 The initial interaction plane is parallel to the camera image plane, centered at
@@ -358,8 +388,8 @@ python -m magicpointer wrist-tilt --camera 0 --fps 30
 
 Keep index and middle fingers straight and curl ring/little fingers. Let the
 thumb rest comfortably; its position is ignored in this isolated wrist experiment
-because it has no click actions. The normal classifier readout may say `right click`
-regardless of its estimated thumb state; this does not trigger a click or cancel wrist scrolling. With the camera approximately level near the screen, point the two
+because it has no click actions. The normal classifier readout may say `unrecognized`
+when it estimates an open thumb; this does not trigger a click or cancel wrist scrolling. With the camera approximately level near the screen, point the two
 fingers toward the screen/camera in a comfortable neutral direction. Hold steady
 for half a second and press **Space**. This starts the simulated scroll controller
 immediately; no D calibration is needed.

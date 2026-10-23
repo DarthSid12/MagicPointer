@@ -586,3 +586,47 @@ Variants that resumed dwell across a different pose, credited bridged frames, or
 used a symmetric thumb margin did produce false clicks and were rejected; see the
 report. Local regression run (Python 3.11): 146 tests, 145 passed, 1 Windows-only
 check skipped. Real-hand and live validation remain pending.
+
+## 14 Real-time pipeline audit and B16
+
+Full debug-loop benchmark with real MediaPipe detection on 1080p frames and two
+simulated free-running 30 FPS cameras with one-frame buffers: 27.7 → 30.0 FPS
+(camera-limited), median frame age at detection 25.0 → 11.9 ms (p95 46.6 → 23.3
+ms). With Windows' default ~15 ms `waitKey` modelled before and the 1 ms timer
+after: 17.1 → 30.0 FPS. Two 1080p detections take 32.7 ms sequentially and 16.7
+ms in parallel. Wall-marker checks measured 5–122 ms per 1080p image and now run
+in the background (B16).
+
+New tests cover newest-frame capture without repeats, pair catch-up, background
+reopening and the 5 s give-up error with simulated devices; smooth pointer glide,
+exact click landing, settled-pointer idling, fine scroll draining and background
+error reporting; crop recovery mapping, clamping, gating, expiry, duplicate
+suppression and ownership continuity; marker-check debouncing and non-blocking
+checks; parallel detection order and timing; and an uncalibrated one-camera real
+control session that activates, moves the patched desktop pointer and clicks once.
+The previous test that rejected real uncalibrated control now checks it starts
+without loading calibration. The adaptive-detection log test now
+runs with `--no-crop-recovery` to keep that experiment isolated.
+
+Local regression run (Python 3.11): 168 tests, 167 passed, 1 Windows-only check
+skipped. `pip check`, CLI help and both blank-frame tracker checks pass. Not
+validated: real cameras, Windows timer and input behaviour, macOS pixel
+scrolling, and crop recovery on real distant hands.
+
+## 6.1 Index + little finger right click (resolves B7)
+
+Right click is now index and little finger extended with middle and ring curled,
+thumb ignored; the thumb + index + middle chord is unrecognized. Synthetic
+jittered two-view sessions through fusion, stabilization and the engine:
+
+| Landmark jitter | Exactly one left + one right click (previous chord → new) |
+| --- | --- |
+| 4 mm | 96% → 99% |
+| 5 mm | 63% → 80% |
+| 6 mm | 14% → 33% |
+
+Holding point, two-finger and fist poses for 33 simulated minutes per condition
+at 4, 5 and 6 mm produced no false clicks. A half-raised ring finger is
+unrecognized on a fresh hand and keeps an established right click. Local
+regression run (Python 3.11): 170 tests, 169 passed, 1 Windows-only check
+skipped. Live comfort and detection of the little finger at distance are pending.

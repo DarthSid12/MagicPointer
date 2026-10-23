@@ -55,7 +55,7 @@ def parser():
         cmd.add_argument("--calibration", type=Path, default=Path("calibration.json"))
         if name == "run":
             cmd.add_argument("--debug", action="store_true", help="one-/two-camera debug with automatic data recording; stereo preview works before calibration; no OS input")
-            cmd.add_argument("--uncalibrated", action="store_true", help="force approximate image-space testing without calibration; requires --debug")
+            cmd.add_argument("--uncalibrated", action="store_true", help="use an approximate image-space pointer without calibration; moves the real pointer unless --debug")
             cmd.add_argument("--adaptive-detection", action="store_true", help="experimental lower-threshold retry in a missing camera; requires two-camera --debug")
             cmd.add_argument("--output", type=Path, default=Path("diagnostics"), help="debug-session recording directory (default: diagnostics)")
             cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))
@@ -64,6 +64,12 @@ def parser():
             cmd.add_argument("--mirror-x", action=argparse.BooleanOptionalAction, default=True)
             cmd.add_argument("--mute", action="store_true")
             cmd.add_argument("--max-hands", type=hand_limit, default=4, help="maximum hands detected per camera (1-8, default: 4)")
+            cmd.add_argument("--activation-seconds", type=positive, default=2.5,
+                             help="fist hold that selects and activates a hand (default: 2.5)")
+            cmd.add_argument("--crop-recovery", action=argparse.BooleanOptionalAction, default=True,
+                             help="re-detect a recently lost hand in a magnified crop around its last position")
+            cmd.add_argument("--smooth-scroll", action=argparse.BooleanOptionalAction, default=True,
+                             help="send fine-grained wheel steps; --no-smooth-scroll sends whole lines for apps that ignore fine wheel input")
         else:
             cmd.add_argument("--square-mm", type=positive, default=25., help="measured checkerboard square edge in mm")
             cmd.add_argument("--marker-size", type=positive, required=True, help="measured wall marker black square edge in metres")
