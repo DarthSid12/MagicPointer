@@ -283,12 +283,23 @@ class TwoCameraDebugTests(unittest.TestCase):
         self.assertTrue(any(event['kind'] == 'activate' for row in rows for event in row['events']))
         markers.assert_not_called()
 
-    def test_uncalibrated_flag_cannot_enable_real_desktop_input(self):
-        args = parser().parse_args(['run', '--right', '1', '--uncalibrated'])
-        with patch.object(app.Stereo, 'load') as load, patch('magicpointer.desktop.Desktop') as desktop:
-            with self.assertRaisesRegex(ValueError, '--debug'):
-                app.run(args)
-            load.assert_not_called()
+    def test_uncalibrated_real_control_needs_no_calibration_and_drives_desktop(self):
+        for cameras in (['--right', '1'], []):
+            args = parser().parse_args(['run', '--uncalibrated', *cameras])
+            with self.subTest(cameras=cameras), patch.object(app.Stereo, 'load') as load, \
+                    patch('magicpointer.desktop.Desktop') as desktop, \
+                    patch.object(app, 'Cameras', side_effect=ValueError('no cameras in test')), \
+                    patch.object(app, 'Tracker'), patch.object(app, 'Chimes'), \
+                    patch.object(app.cv2, 'destroyAllWindows'), patch('builtins.print'):
+                with self.assertRaisesRegex(ValueError, 'no cameras in test'):
+                    app.run(args)
+                load.assert_not_called()
+                desktop.assert_called_once()
+
+    def test_one_camera_real_control_still_needs_uncalibrated_or_debug(self):
+        with patch('magicpointer.desktop.Desktop') as desktop:
+            with self.assertRaisesRegex(ValueError, '--uncalibrated'):
+                app.run(parser().parse_args(['run']))
             desktop.assert_not_called()
 
 

@@ -55,7 +55,7 @@ def parser():
         cmd.add_argument("--calibration", type=Path, default=Path("calibration.json"))
         if name == "run":
             cmd.add_argument("--debug", action="store_true", help="one-/two-camera debug with automatic data recording; stereo preview works before calibration; no OS input")
-            cmd.add_argument("--uncalibrated", action="store_true", help="force approximate image-space testing without calibration; requires --debug")
+            cmd.add_argument("--uncalibrated", action="store_true", help="use an approximate image-space pointer without calibration; moves the real pointer unless --debug")
             cmd.add_argument("--adaptive-detection", action="store_true", help="experimental lower-threshold retry in a missing camera; requires two-camera --debug")
             cmd.add_argument("--output", type=Path, default=Path("diagnostics"), help="debug-session recording directory (default: diagnostics)")
             cmd.add_argument("--model", type=Path, default=Path("models/hand_landmarker.task"))

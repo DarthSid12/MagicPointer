@@ -602,10 +602,13 @@ reopening and the 5 s give-up error with simulated devices; smooth pointer glide
 exact click landing, settled-pointer idling, fine scroll draining and background
 error reporting; crop recovery mapping, clamping, gating, expiry, duplicate
 suppression and ownership continuity; marker-check debouncing and non-blocking
-checks; parallel detection order and timing. The adaptive-detection log test now
+checks; parallel detection order and timing; and an uncalibrated one-camera real
+control session that activates, moves the patched desktop pointer and clicks once.
+The previous test that rejected real uncalibrated control now checks it starts
+without loading calibration. The adaptive-detection log test now
 runs with `--no-crop-recovery` to keep that experiment isolated.
 
-Local regression run (Python 3.11): 166 tests, 165 passed, 1 Windows-only check
+Local regression run (Python 3.11): 168 tests, 167 passed, 1 Windows-only check
 skipped. `pip check`, CLI help and both blank-frame tracker checks pass. Not
 validated: real cameras, Windows timer and input behaviour, macOS pixel
 scrolling, and crop recovery on real distant hands.

@@ -13,9 +13,9 @@ from magicpointer.tracking import Hand
 from test_tracking import hand
 
 
-def debug_session(poses=None, output=None, resources=None):
+def debug_session(poses=None, output=None, resources=None, argv=('run', '--debug', '--mute')):
     """Exercise actual render/engine/dispatch loop, with synthetic camera input."""
-    args = parser().parse_args(['run', '--debug', '--mute'])
+    args = parser().parse_args(list(argv))
     poses = poses or [Gesture.FIST]*55 + [Gesture.POINT]*5 + [Gesture.LEFT]*8 + [Gesture.POINT]*5 + [Gesture.PALM]*8
     pixels = np.array([(900.+(i%4)*25, 650.-(i//4)*30) for i in range(21)])
     camera = MagicMock()
@@ -63,13 +63,32 @@ def debug_session(poses=None, output=None, resources=None):
             patch.object(app.cv2, 'imshow', side_effect=lambda _, panel: displays.append(panel.copy())), \
             patch.object(app.cv2, 'waitKey', side_effect=key), patch.object(app.cv2, 'getWindowProperty', return_value=1), \
             patch.object(app.cv2, 'destroyAllWindows'), patch('magicpointer.desktop.Desktop') as desktop:
+        native = desktop.return_value
+        native.pixel.side_effect = lambda point: (round(point[0] * 1919), round(point[1] * 1079))
+        native.wheel_step = 1 / 120
+        if resources is not None:
+            resources['desktop'] = desktop
         args.output = Path(output or directory)
         result = app.run(args)
-        desktop.assert_not_called()
+        if args.debug:
+            desktop.assert_not_called()
     return result, displays, tracker, camera, audio
 
 
 class AppTests(unittest.TestCase):
+    def test_uncalibrated_one_camera_session_moves_and_clicks_real_pointer(self):
+        resources = {}
+        poses = [Gesture.FIST]*95 + [Gesture.POINT]*10 + [Gesture.LEFT]*10 + [Gesture.POINT]*5 + [Gesture.PALM]*8
+        with patch('builtins.print'):
+            result, displays, _, _, audio = debug_session(poses, resources=resources,
+                                                         argv=('run', '--uncalibrated', '--mute'))
+        self.assertEqual(result, 0)
+        native = resources['desktop'].return_value
+        self.assertTrue(native.move.called)
+        self.assertEqual([call.args for call in native.click.call_args_list], [('left',)])
+        self.assertEqual([c.args for c in audio.play.call_args_list][:1], [(True,)])
+        self.assertEqual(displays[0].shape, (540, 960, 3))
+
     def test_debug_session_renders_states_and_never_constructs_desktop(self):
         result, displays, tracker, camera, audio = debug_session()
         self.assertEqual(result, 0)

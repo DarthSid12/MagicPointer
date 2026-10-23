@@ -173,10 +173,9 @@ def observe(left, right=None, *, stereo=None, scrolling=False, mono_scale=1., co
 def run(args):
     if args.adaptive_detection and (not args.debug or args.right is None):
         raise ValueError("Adaptive detection requires two-camera --debug; desktop control is unchanged")
-    if args.uncalibrated and not args.debug:
-        raise ValueError("Uncalibrated testing requires --debug; desktop control requires stereo calibration")
-    if not args.debug and args.right is None:
-        raise ValueError("Real pointer control needs two cameras. For one-camera preview use run --debug")
+    if not args.debug and args.right is None and not args.uncalibrated:
+        raise ValueError("Calibrated pointer control needs two cameras. For one camera use run --uncalibrated, "
+                         "or run --debug for a preview")
     two_cameras = args.right is not None
     stereo, calibration_issue = None, None
     if args.uncalibrated:
@@ -252,11 +251,15 @@ def run(args):
                 engine.height = args.workspace_height*10
             if log:
                 log.metadata.update(cameras=cameras.info, workspace_width=engine.width, workspace_height=engine.height)
-            if preview_only:
+            if not args.debug and stereo is None:
+                print("UNCALIBRATED CONTROL: the real pointer follows an approximate image-space position; "
+                      "no metric depth or wall-marker checks. Open palm, Q or Escape stops input.")
+            elif preview_only:
                 print("UNCALIBRATED TEST: shared gestures and approximate virtual pointer; no metric depth.")
                 print("Calibration:", calibration_issue)
             print("Camera negotiated settings:", cameras.info)
-            print("DEBUG: preview only; no OS pointer input" if args.debug else "STEREO CONTROL: Q/Escape or close window to stop")
+            print("DEBUG: preview only; no OS pointer input" if args.debug else
+                  ("STEREO CONTROL" if stereo else "DESKTOP CONTROL") + ": Q/Escape or close window to stop")
             print(f"Show one fist for {args.activation_seconds:g} seconds to select that hand; open its palm to release. Other hands are ignored.")
             print("Two fingers toward screen: hold steady to set scroll neutral; tilt up/down. Index-only exits scrolling.")
             start, count, measured_fps = time.monotonic(), 0, 0.
@@ -397,7 +400,7 @@ def run(args):
                 else:
                     panel = np.full((540, 960, 3), (25, 25, 25), dtype=np.uint8)
                 # Primary-camera raw view is intentionally labelled: controls mirror X by default.
-                title = "DEBUG / NO DESKTOP INPUT" if args.debug else "STEREO / DESKTOP CONTROL"
+                title = "DEBUG / NO DESKTOP INPUT" if args.debug else ("STEREO / DESKTOP CONTROL" if stereo else "UNCALIBRATED / DESKTOP CONTROL")
                 if args.debug and two_cameras:
                     title = "TWO-CAMERA DEBUG / NO OS INPUT / " + ("UNCALIBRATED TEST" if preview_only else "CALIBRATED STEREO")
                 lines = [title,

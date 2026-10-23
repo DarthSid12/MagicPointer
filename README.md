@@ -131,9 +131,18 @@ mode even when a calibration file exists, use:
 python -m magicpointer run --debug --uncalibrated --left 0 --right 1 --fps 30
 ```
 
-`--uncalibrated` is allowed only with `--debug`. After completing
-calibration, restart without `--uncalibrated`: **CALIBRATED STEREO** checks wall markers
-before enabling the usual fist/point/click/scroll virtual-pointer simulation.
+Without `--debug`, `--uncalibrated` drives the **real** pointer from the same
+approximate position, with one or two cameras and no printouts:
+
+```sh
+python -m magicpointer run --uncalibrated --left 0 --right 1 --fps 30
+```
+
+Hand movement is measured in palm lengths at activation, so the workspace keeps
+roughly the same physical size at any distance. There is no depth measurement or
+wall-marker check; open your palm, or press Q or Escape, to stop input. After
+completing calibration, restart without `--uncalibrated`: **CALIBRATED STEREO**
+checks wall markers before enabling the usual fist/point/click/scroll control.
 Pair timing, hand association, depth validity and tracking-loss checks still apply.
 
 Each camera extracts landmarks for all detected hands. A matched pair is normalized
@@ -273,8 +282,8 @@ python -m magicpointer run --left 0 --right 1 --fps 30
 
 With a matching `calibration.json`, debug verifies the wall markers before
 allowing simulated activation. Without usable calibration, debug uses the
-uncalibrated testing mode described above. Real desktop control always requires valid
-calibration and marker verification. Marker verification replaces repeating the full checkerboard process
+uncalibrated testing mode described above. Real desktop control uses calibration and
+marker verification unless `--uncalibrated` is given. Marker verification replaces repeating the full checkerboard process
 when the rig stays fixed. During use, visible markers are checked about once a
 second in the background, so checks never stall the pointer. A displacement seen
 on three consecutive checks stops the app and requires recalibration; a single

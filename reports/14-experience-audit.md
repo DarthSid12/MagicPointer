@@ -51,6 +51,11 @@ measurements below are local and synthetic; none use the user's cameras.
    usual. With an owner locked, the owner's position is remembered; otherwise
    the largest hand in each view.
 7. **`--activation-seconds`** (default 2.5) for the fist hold.
+8. **Opt-in uncalibrated real control.** `run --uncalibrated` without `--debug`
+   now moves the real pointer, with one or two cameras, using the same
+   palm-normalized image-space position as the uncalibrated preview. It has no
+   depth measurement or wall-marker check, and says so at startup and in the
+   window title. Without the flag, real control still requires calibration.
 
 ## Measurements
 
@@ -71,8 +76,6 @@ capture and inference costs, and the 1 ms timer's effect, still need a live run.
 
 ## Not changed
 
-- **Real control without calibration** stays disabled, as designed. The guard is
-  at the top of `app.run`.
 - **Gesture set and B7** (right-click versus scroll entry) are unchanged.
 - **The 40 ms pair tolerance** is unchanged; cameras that drop to 15 FPS in low
   light can still exceed it.
