@@ -44,7 +44,7 @@ def debug_session(poses=None, output=None, resources=None, argv=('run', '--debug
             return pose
         thumb, fingers = {
             Gesture.FIST: (False, [0, 0, 0, 0]), Gesture.POINT: (False, [1, 0, 0, 0]),
-            Gesture.LEFT: (True, [1, 0, 0, 0]), Gesture.RIGHT: (True, [1, 1, 0, 0]),
+            Gesture.LEFT: (True, [1, 0, 0, 0]), Gesture.RIGHT: (False, [1, 0, 0, 1]),
             Gesture.SCROLL: (False, [1, 1, 0, 0]), Gesture.PALM: (True, [1, 1, 1, 1]),
         }[pose]
         return Hand(pixels.copy(), hand(thumb, fingers), 'Right', pose)

@@ -14,7 +14,7 @@ from test_tracking import hand
 def pose(gesture=Gesture.FIST, x=400., label='Right', rotation=0.):
     thumb, fingers = {Gesture.FIST: (False, [0, 0, 0, 0]), Gesture.POINT: (False, [1, 0, 0, 0]),
                       Gesture.PALM: (True, [1, 1, 1, 1]), Gesture.LEFT: (True, [1, 0, 0, 0]),
-                      Gesture.RIGHT: (True, [1, 1, 0, 0]), Gesture.SCROLL: (False, [1, 1, 0, 0])}[gesture]
+                      Gesture.RIGHT: (False, [1, 0, 0, 1]), Gesture.SCROLL: (False, [1, 1, 0, 0])}[gesture]
     world = hand(thumb, fingers)
     angle = math.radians(rotation)
     matrix = np.array([[math.cos(angle), 0, math.sin(angle)], [0, 1, 0], [-math.sin(angle), 0, math.cos(angle)]])

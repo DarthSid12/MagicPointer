@@ -326,11 +326,11 @@ pending click/scroll state cleared and pointer position rebased.
 | Index extended, other fingers curled | Index tip moves pointer within the local workspace |
 | Index + thumb | One left click after 0.18 s of stable recognition, at the pointer position from just before the thumb opened |
 | Index + middle toward screen | Enter wrist scrolling; hold steady to capture neutral automatically, then tilt up/down |
-| Index + thumb + middle outside scrolling | One right click after 0.18 s of stable recognition |
+| Index + little finger up, middle and ring curled (thumb either way) | One right click after 0.18 s of stable recognition |
 | Selected hand fully open | Stop input; two-view palm agreement releases immediately, otherwise confirm after 0.18 s; deactivation chime |
 
-Open the fingers for a click chord together: holding thumb-only long enough is a
-left click, even if you later add the middle finger. After a click, return to
+Right click shares no finger change with left click or scrolling, and raising
+the little finger does not move the index tip that drives the pointer. After a click, return to
 index-only or a fist for 0.18 s before another click or scroll. Holding a click
 pose does not repeat clicks. The pointer holds still while a click pose is held.
 Unrecognized poses produce no pointer actions; a briefly unrecognized frame within
@@ -354,9 +354,8 @@ fist-like classifier label while scrolling, provided its pitch remains valid.
 
 Stereo control uses triangulated finger direction in the primary camera's axes.
 The one-camera debug mode previews the same interaction using model-estimated
-pitch. Keep the cameras approximately level near the screen. Right-click entry
-still requires the normal thumb chord; once scrolling has started, that chord
-cannot click until you exit. Model thumb-estimation discrepancies during tilt
+pitch. Keep the cameras approximately level near the screen. Clicks are ignored
+while scrolling; exit with index-only first. Model thumb-estimation discrepancies during tilt
 are tracked in B6; ignoring them during scrolling does not correct the classifier.
 
 The initial interaction plane is parallel to the camera image plane, centered at
@@ -389,8 +388,8 @@ python -m magicpointer wrist-tilt --camera 0 --fps 30
 
 Keep index and middle fingers straight and curl ring/little fingers. Let the
 thumb rest comfortably; its position is ignored in this isolated wrist experiment
-because it has no click actions. The normal classifier readout may say `right click`
-regardless of its estimated thumb state; this does not trigger a click or cancel wrist scrolling. With the camera approximately level near the screen, point the two
+because it has no click actions. The normal classifier readout may say `unrecognized`
+when it estimates an open thumb; this does not trigger a click or cancel wrist scrolling. With the camera approximately level near the screen, point the two
 fingers toward the screen/camera in a comfortable neutral direction. Hold steady
 for half a second and press **Space**. This starts the simulated scroll controller
 immediately; no D calibration is needed.

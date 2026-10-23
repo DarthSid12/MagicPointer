@@ -25,8 +25,8 @@ running on macOS does not establish that Windows input injection works.
 | 3 | Hand landmarks and debug feed with hand box and state legend | One camera works without stereo calibration; no hand, occlusion, disconnect and clean exit handled; displayed state agrees with engine state. |
 | 4 | Stable closed-fist activation, origin capture, cursor centering, subtle activation chime | Inactive gestures produce no pointer actions; one activation/chime per accepted transition; activation cannot occur without valid tracking and required calibration. |
 | 5 | Continuous index-tip mapping and distance compensation | Test center, screen edges, jitter, depth changes and lost tracking; validate chosen mapping against known synthetic geometry and actual camera observations. |
-| 6 | Left/right click recognition and OS adapter | One click per held gesture; release required to repeat; right-click chord does not accidentally emit a left click while fingers transition; verify actual Windows button events. |
-| 7 | Two-finger scrolling | Scroll direction and rate follow motion; entering scroll does not click; right-click chord takes precedence over scrolling; verify actual Windows scroll events. |
+| 6 | Left/right click recognition and OS adapter | One click per held gesture; release required to repeat; right click (index + little finger) shares no finger change with left click or scrolling; verify actual Windows button events. |
+| 7 | Two-finger scrolling | Scroll direction and rate follow motion; entering scroll does not click; scroll and right-click gestures do not overlap; verify actual Windows scroll events. |
 | 8 | Full-palm stop and distinct chime | Deactivation stops movement/click/scroll, emits one chime, clears session origin, and requires another valid fist activation; lost tracking never continues stale actions. |
 
 The physical accuracy checks require the user's rig. Synthetic tests can verify
@@ -64,8 +64,8 @@ or stale pairs. Gesture classification should use relative joint geometry rather
 than image-axis finger-height comparisons to support varied orientations.
 
 Use a deterministic gesture state engine with temporal stabilization. Full palm
-must deactivate before other actions. A stable right-click chord must be resolved
-before committing a thumb-only left click or two-finger scroll. The exact timing
+must deactivate before other actions. Right click is index + little finger with
+the thumb ignored, so it cannot race a thumb-only left click or two-finger scroll. The exact timing
 thresholds need hands-on tuning and should be documented when implemented.
 
 Implemented initial timings: fist activation 0.45 s, gesture confirmation 0.18 s,

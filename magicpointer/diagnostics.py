@@ -19,7 +19,7 @@ POSES = [
     (Gesture.POINT, "Extend index ONLY; curl middle/ring/little; tuck thumb in"),
     (Gesture.LEFT, "Extend index + thumb; curl middle/ring/little"),
     (Gesture.SCROLL, "Extend index + middle; curl ring/little; tuck thumb in"),
-    (Gesture.RIGHT, "Extend index + middle + thumb; curl ring/little"),
+    (Gesture.RIGHT, "Extend index + little finger; curl middle/ring; thumb either way"),
     (Gesture.PALM, "Open ALL five fingers into a natural palm"),
 ]
 ANGLES = [

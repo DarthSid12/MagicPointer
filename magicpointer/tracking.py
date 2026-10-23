@@ -12,10 +12,19 @@ SHAPES = {
     (0, 0, 0, 0, 0): Gesture.FIST,
     (0, 1, 0, 0, 0): Gesture.POINT,
     (1, 1, 0, 0, 0): Gesture.LEFT,
-    (1, 1, 1, 0, 0): Gesture.RIGHT,
     (0, 1, 1, 0, 0): Gesture.SCROLL,
     (1, 1, 1, 1, 1): Gesture.PALM,
 }
+# Right click: index and little finger up, middle and ring curled, thumb ignored.
+# It shares no finger change with scrolling or left click, and raising the little
+# finger does not move the index tip that drives the pointer.
+RIGHT_FINGERS = (1, 0, 0, 1)
+
+
+def shape(signature):
+    if tuple(signature[1:]) == RIGHT_FINGERS:
+        return Gesture.RIGHT
+    return SHAPES.get(tuple(signature), Gesture.UNKNOWN)
 
 
 def distance(a, b):
@@ -61,7 +70,7 @@ def gesture_metrics(points):
     # a straight thumb laid across the palm from being counted as extended.
     thumb = 1 if thumb_angle > 145 and separation > .30 else (0 if thumb_angle < 140 or separation < .30 else -1)
     signature = (thumb, *fingers)
-    gesture = SHAPES.get(signature, Gesture.UNKNOWN)
+    gesture = shape(signature)
     return {"valid": True, "classifier_version": CLASSIFIER_VERSION, "palm_size": palm, "fingers": measurements,
             "thumb": {"ip_degrees": thumb_angle, "separation_ratio": separation, "state": thumb},
             "signature": list(signature), "gesture": gesture.value}
@@ -98,7 +107,7 @@ class PoseStabilizer:
                 signature[0] = 0
             signature = [old if new == -1 else new for new, old in zip(signature, previous)]
         self.signature, self.time = tuple(signature), now
-        return SHAPES.get(self.signature, Gesture.UNKNOWN)
+        return shape(self.signature)
 
 
 @dataclass

@@ -612,3 +612,21 @@ Local regression run (Python 3.11): 168 tests, 167 passed, 1 Windows-only check
 skipped. `pip check`, CLI help and both blank-frame tracker checks pass. Not
 validated: real cameras, Windows timer and input behaviour, macOS pixel
 scrolling, and crop recovery on real distant hands.
+
+## 6.1 Index + little finger right click (resolves B7)
+
+Right click is now index and little finger extended with middle and ring curled,
+thumb ignored; the thumb + index + middle chord is unrecognized. Synthetic
+jittered two-view sessions through fusion, stabilization and the engine:
+
+| Landmark jitter | Exactly one left + one right click (previous chord → new) |
+| --- | --- |
+| 4 mm | 96% → 99% |
+| 5 mm | 63% → 80% |
+| 6 mm | 14% → 33% |
+
+Holding point, two-finger and fist poses for 33 simulated minutes per condition
+at 4, 5 and 6 mm produced no false clicks. A half-raised ring finger is
+unrecognized on a fresh hand and keeps an established right click. Local
+regression run (Python 3.11): 170 tests, 169 passed, 1 Windows-only check
+skipped. Live comfort and detection of the little finger at distance are pending.

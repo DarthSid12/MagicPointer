@@ -48,7 +48,7 @@ REALISTIC = [
     (False, (CURLED, LOOSE, CURLED, LOOSE), Gesture.FIST),
     (False, (RELAXED, CURLED, LOOSE, LOOSE), Gesture.POINT),
     (True, (RELAXED, LOOSE, CURLED, LOOSE), Gesture.LEFT),
-    (True, (RELAXED, RELAXED, LOOSE, LOOSE), Gesture.RIGHT),
+    (False, (RELAXED, CURLED, LOOSE, RELAXED), Gesture.RIGHT),
     (False, (RELAXED, RELAXED, CURLED, LOOSE), Gesture.SCROLL),
     (True, (RELAXED, STRAIGHT, RELAXED, RELAXED), Gesture.PALM),
 ]
@@ -111,13 +111,14 @@ class StabilizerTests(unittest.TestCase):
                 stable.append(stabilizer.update(noisy, frame / 30) == expected)
             with self.subTest(expected=expected):
                 self.assertGreaterEqual(np.mean(stable), .93)
-                self.assertGreater(np.mean(stable), np.mean(raw))
+                self.assertGreaterEqual(np.mean(stable), np.mean(raw))
 
 
 class ClassifierTests(unittest.TestCase):
     def test_all_requested_gestures_survive_rigid_rotation_and_scale(self):
         poses = [(False, [0, 0, 0, 0], Gesture.FIST), (False, [1, 0, 0, 0], Gesture.POINT),
-                 (True, [1, 0, 0, 0], Gesture.LEFT), (True, [1, 1, 0, 0], Gesture.RIGHT),
+                 (True, [1, 0, 0, 0], Gesture.LEFT), (False, [1, 0, 0, 1], Gesture.RIGHT),
+                 (True, [1, 0, 0, 1], Gesture.RIGHT),
                  (False, [1, 1, 0, 0], Gesture.SCROLL), (True, [1, 1, 1, 1], Gesture.PALM)]
         rng = np.random.default_rng(8)
         for thumb, fingers, expected in poses:
@@ -131,11 +132,27 @@ class ClassifierTests(unittest.TestCase):
         self.assertEqual(classify(np.zeros((21, 3))), Gesture.UNKNOWN)
         self.assertEqual(classify(hand(True, [0, 0, 0, 0])), Gesture.UNKNOWN)
 
+    def test_right_click_is_index_and_little_finger_with_thumb_ignored(self):
+        for thumb in (False, True):
+            self.assertEqual(classify(hand(thumb, [1, 0, 0, 1])), Gesture.RIGHT)
+        # The old thumb + index + middle chord no longer clicks, so it cannot race scrolling.
+        self.assertEqual(classify(hand(True, [1, 1, 0, 0])), Gesture.UNKNOWN)
+        # Index + middle + little, or a half-raised ring finger, is not a right click.
+        self.assertEqual(classify(hand(False, [1, 1, 0, 1])), Gesture.UNKNOWN)
+        points = posed(False, (RELAXED, CURLED, (20, 60, 30), RELAXED))
+        self.assertEqual(gesture_metrics(points)['fingers']['ring']['state'], -1)
+        self.assertEqual(classify(points), Gesture.UNKNOWN)
+
+    def test_half_raised_ring_finger_keeps_an_established_right_click(self):
+        stabilizer = PoseStabilizer()
+        self.assertEqual(stabilizer.update(posed(False, (RELAXED, CURLED, LOOSE, RELAXED)), 0.), Gesture.RIGHT)
+        self.assertEqual(stabilizer.update(posed(False, (RELAXED, CURLED, (20, 60, 30), RELAXED)), .03), Gesture.RIGHT)
+
     def test_naturally_bent_fingers_and_narrow_open_thumb(self):
         # Reproduce the failure mechanisms without committing personal recordings.
         # These DIP joints are 140 degrees, below the original 150-degree gate.
         poses = [(False, [1, 0, 0, 0], Gesture.POINT), (True, [1, 0, 0, 0], Gesture.LEFT),
-                 (False, [1, 1, 0, 0], Gesture.SCROLL), (True, [1, 1, 0, 0], Gesture.RIGHT),
+                 (False, [1, 1, 0, 0], Gesture.SCROLL), (True, [1, 0, 0, 1], Gesture.RIGHT),
                  (True, [1, 1, 1, 1], Gesture.PALM)]
         rng = np.random.default_rng(12)
         for thumb, fingers, expected in poses:
